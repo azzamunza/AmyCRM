@@ -776,169 +776,197 @@
         </div>
     </div>
     
+       <!-- Google Sign-In -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
 
     <script>
-      const allowedEmails = [
-        "youremail@gmail.com",
-        "team@example.com"
-      ];
-        
-
-          // This runs when the Google sign-in returns a credential
-          function handleCredentialResponse(response) {
-            const data = jwt_decode(response.credential);
-            const email = data.email;
-        
-            // ✅ This is where your snippet goes:
-            if (allowedEmails.includes(email)) {
-              document.body.style.display = "block";           // show the CRM
-              document.getElementById("signin").style.display = "none";
-              initCRM();                                       // start the CRM logic
-            } else {
-              alert("Access denied for " + email);
-              google.accounts.id.disableAutoSelect();
-            }
-          }
-    
-          window.onload = function() {
-            google.accounts.id.initialize({
-              client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-              callback: handleCredentialResponse
-            });
-            google.accounts.id.renderButton(
-              document.getElementById("signin"),
-              { theme: "filled_blue", size: "large" }
-            );
-            google.accounts.id.prompt(); // Show one-tap prompt if available
-          };
-    
-      function handleCredentialResponse(response) {
-        const data = jwt_decode(response.credential);
-        const email = data.email;
-        if (allowedEmails.includes(email)) {
-          document.body.style.display = "block";   // show CRM
-          document.getElementById("signin").style.display = "none";
-        } else {
-          alert("Access denied for " + email);
-          google.accounts.id.disableAutoSelect();
-        }
-      }
-    </script>
-
- <script>
-
-
+    // --- Authorised Users ---
     const allowedEmails = [
-      "you@example.com",
-      "staff1@gmail.com",
-      "nurse2@gmail.com"
+      "youremail@gmail.com",
+      "team@example.com"
     ];
-    
-    function onSignIn(response) {
-      const data = jwt_decode(response.credential); // requires jwt-decode lib
-      const userEmail = data.email;
-    
-      if (allowedEmails.includes(userEmail)) {
-        document.body.style.display = "block";   // show the app
+
+    // --- Google Login Callback ---
+    function handleCredentialResponse(response) {
+      const data = jwt_decode(response.credential);
+      const email = data.email;
+
+      if (allowedEmails.includes(email)) {
+        document.body.style.display = "block";           // show CRM
         document.getElementById("signin").style.display = "none";
+        initCRM();                                       // start CRM logic
       } else {
-        alert("Access denied for " + userEmail);
+        alert("Access denied for " + email);
         google.accounts.id.disableAutoSelect();
       }
     }
 
+    // --- Google Button Setup ---
+    window.onload = function() {
+      google.accounts.id.initialize({
+        client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("signin"),
+        { theme: "filled_blue", size: "large" }
+      );
+      google.accounts.id.prompt();
+    };
+    </script>
 
-        // Data Storage
-        let data = {
-            contacts: [],
-            communications: [],
-            documents: [],
-            incidents: [],
-            lastUpdated: null
+    <script>
+    // ========================
+    // == CRM CORE FUNCTIONS ==
+    // ========================
+
+    let data = {
+      contacts: [],
+      communications: [],
+      documents: [],
+      incidents: [],
+      lastUpdated: null
+    };
+
+    let githubConfig = {
+      username: '',
+      repo: '',
+      token: '',
+      filename: 'crm-data.json',
+      autoSync: false
+    };
+
+    let isSyncing = false;
+
+    // --- Initialise CRM after login ---
+    function initCRM() {
+      loadData();
+      loadGitHubSettings();
+      updateDashboard();
+      setCurrentDateTime();
+      checkGitHubConnection();
+    }
+
+    // --- Data Management ---
+    function loadData() {
+      const stored = localStorage.getItem('crmData');
+      if (stored) {
+        data = JSON.parse(stored);
+        updateAllLists();
+        updateDashboard();
+      }
+    }
+
+    function saveData() {
+      data.lastUpdated = new Date().toISOString();
+      localStorage.setItem('crmData', JSON.stringify(data));
+      updateDashboard();
+
+      if (githubConfig.autoSync && githubConfig.token) {
+        syncToGitHub();
+      }
+    }
+
+    // --- GitHub Configuration ---
+    function loadGitHubSettings() {
+      const stored = localStorage.getItem('githubConfig');
+      if (stored) {
+        githubConfig = JSON.parse(stored);
+        document.getElementById('githubUsername').value = githubConfig.username || '';
+        document.getElementById('githubRepo').value = githubConfig.repo || '';
+        document.getElementById('githubToken').value = githubConfig.token || '';
+        document.getElementById('githubFilename').value = githubConfig.filename || 'crm-data.json';
+        document.getElementById('autoSync').checked = githubConfig.autoSync || false;
+
+        if (githubConfig.lastSync) {
+          document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
+        }
+      }
+    }
+
+    function saveGitHubSettings() {
+      githubConfig.username = document.getElementById('githubUsername').value.trim();
+      githubConfig.repo = document.getElementById('githubRepo').value.trim();
+      githubConfig.token = document.getElementById('githubToken').value.trim();
+      githubConfig.filename = document.getElementById('githubFilename').value.trim() || 'crm-data.json';
+
+      if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+        showMessage('Please fill in all required fields', 'danger');
+        return;
+      }
+
+      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+      showMessage('GitHub settings saved successfully!', 'success');
+      updateSyncStatus('connected');
+    }
+
+    function clearGitHubSettings() {
+      if (confirm('Are you sure you want to clear GitHub settings?')) {
+        githubConfig = {
+          username: '',
+          repo: '',
+          token: '',
+          filename: 'crm-data.json',
+          autoSync: false
         };
+        localStorage.removeItem('githubConfig');
+        document.getElementById('githubUsername').value = '';
+        document.getElementById('githubRepo').value = '';
+        document.getElementById('githubToken').value = '';
+        document.getElementById('githubFilename').value = 'crm-data.json';
+        document.getElementById('autoSync').checked = false;
+        document.getElementById('lastSync').textContent = 'Never';
+        updateSyncStatus('disconnected');
+      }
+    }
 
-        let githubConfig = {
-            username: '',
-            repo: '',
-            token: '',
-            filename: 'crm-data.json',
-            autoSync: false
-        };
+    // --- Placeholder helper functions ---
+    function showMessage(msg, type) {
+      const el = document.getElementById('settingsMessage');
+      el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+    }
 
-        let isSyncing = false;
+    function updateSyncStatus(status) {
+      const indicator = document.getElementById('syncIndicator');
+      const text = document.getElementById('syncText');
+      if (status === 'connected') {
+        indicator.className = 'sync-indicator';
+        text.textContent = 'Connected';
+      } else {
+        indicator.className = 'sync-indicator error';
+        text.textContent = 'Not connected';
+      }
+    }
 
-        // Load data on page load
-        function initCRM() {
-            loadData();
-            loadGitHubSettings();
-            updateDashboard();
-            setCurrentDateTime();
-            checkGitHubConnection();
-        }
+    function updateDashboard() {
+      document.getElementById('totalContacts').textContent = data.contacts.length;
+      document.getElementById('totalCommunications').textContent = data.communications.length;
+      document.getElementById('totalDocuments').textContent = data.documents.length;
+      document.getElementById('totalIncidents').textContent = data.incidents.length;
+    }
 
-        function loadData() {
-            const stored = localStorage.getItem('crmData');
-            if (stored) {
-                data = JSON.parse(stored);
-                updateAllLists();
-                updateDashboard();
-            }
-        }
+    function setCurrentDateTime() {
+      // placeholder
+    }
 
-        function saveData() {
-            data.lastUpdated = new Date().toISOString();
-            localStorage.setItem('crmData', JSON.stringify(data));
-            updateDashboard();
-            
-            // Auto-sync to GitHub if enabled
-            if (githubConfig.autoSync && githubConfig.token) {
-                syncToGitHub();
-            }
-        }
+    function checkGitHubConnection() {
+      // placeholder - could test repo access here
+    }
 
-        // GitHub Functions
-        function loadGitHubSettings() {
-            const stored = localStorage.getItem('githubConfig');
-            if (stored) {
-                githubConfig = JSON.parse(stored);
-                document.getElementById('githubUsername').value = githubConfig.username || '';
-                document.getElementById('githubRepo').value = githubConfig.repo || '';
-                document.getElementById('githubToken').value = githubConfig.token || '';
-                document.getElementById('githubFilename').value = githubConfig.filename || 'crm-data.json';
-                document.getElementById('autoSync').checked = githubConfig.autoSync || false;
-                
-                if (githubConfig.lastSync) {
-                    document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
-                }
-            }
-        }
+    function updateAllLists() {
+      // placeholder - rebuild UI lists
+    }
 
-        function saveGitHubSettings() {
-            githubConfig.username = document.getElementById('githubUsername').value.trim();
-            githubConfig.repo = document.getElementById('githubRepo').value.trim();
-            githubConfig.token = document.getElementById('githubToken').value.trim();
-            githubConfig.filename = document.getElementById('githubFilename').value.trim() || 'crm-data.json';
+    function syncToGitHub() {
+      // placeholder for GitHub sync logic
+    }
 
-            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
-                showMessage('Please fill in all required fields', 'danger');
-                return;
-            }
+    function toggleAutoSync() {
+      githubConfig.autoSync = document.getElementById('autoSync').checked;
+      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+    }
 
-            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-            showMessage('GitHub settings saved successfully!', 'success');
-            updateSyncStatus('connected');
-        }
-
-        function clearGitHubSettings() {
-            if (confirm('Are you sure you want to clear GitHub settings?')) {
-                githubConfig = {
-                    username: '',
-                    repo: '',
-                    token: '',
-                    filename: 'crm-data.json',
-                    autoSync: false
-                };
-                localStorage.removeItem('githubConfig');
-                document.getElementById('githubUsername').value =
+    </script>
+</body>
+</html>
