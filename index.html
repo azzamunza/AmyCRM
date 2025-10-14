@@ -404,7 +404,13 @@
         }
     </style>
 </head>
-<body>
+<body style="display:none;">
+    <div id="signin"></div> <!-- Placeholder for login button -->    
+    <div id="g_id_onload"
+         data-client_id="YOUR_CLIENT_ID.apps.googleusercontent.com"
+         data-callback="onSignIn">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
     <div class="container">
         <div class="header">
             <h1>📋 Personal Provider CRM</h1>
@@ -769,8 +775,81 @@
             </div>
         </div>
     </div>
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
 
     <script>
+      const allowedEmails = [
+        "youremail@gmail.com",
+        "team@example.com"
+      ];
+        
+
+          // This runs when the Google sign-in returns a credential
+          function handleCredentialResponse(response) {
+            const data = jwt_decode(response.credential);
+            const email = data.email;
+        
+            // ✅ This is where your snippet goes:
+            if (allowedEmails.includes(email)) {
+              document.body.style.display = "block";           // show the CRM
+              document.getElementById("signin").style.display = "none";
+              initCRM();                                       // start the CRM logic
+            } else {
+              alert("Access denied for " + email);
+              google.accounts.id.disableAutoSelect();
+            }
+          }
+    
+          window.onload = function() {
+            google.accounts.id.initialize({
+              client_id: "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+              callback: handleCredentialResponse
+            });
+            google.accounts.id.renderButton(
+              document.getElementById("signin"),
+              { theme: "filled_blue", size: "large" }
+            );
+            google.accounts.id.prompt(); // Show one-tap prompt if available
+          };
+    
+      function handleCredentialResponse(response) {
+        const data = jwt_decode(response.credential);
+        const email = data.email;
+        if (allowedEmails.includes(email)) {
+          document.body.style.display = "block";   // show CRM
+          document.getElementById("signin").style.display = "none";
+        } else {
+          alert("Access denied for " + email);
+          google.accounts.id.disableAutoSelect();
+        }
+      }
+    </script>
+
+ <script>
+
+
+    const allowedEmails = [
+      "you@example.com",
+      "staff1@gmail.com",
+      "nurse2@gmail.com"
+    ];
+    
+    function onSignIn(response) {
+      const data = jwt_decode(response.credential); // requires jwt-decode lib
+      const userEmail = data.email;
+    
+      if (allowedEmails.includes(userEmail)) {
+        document.body.style.display = "block";   // show the app
+        document.getElementById("signin").style.display = "none";
+      } else {
+        alert("Access denied for " + userEmail);
+        google.accounts.id.disableAutoSelect();
+      }
+    }
+
+
         // Data Storage
         let data = {
             contacts: [],
@@ -791,13 +870,13 @@
         let isSyncing = false;
 
         // Load data on page load
-        window.onload = function() {
+        function initCRM() {
             loadData();
             loadGitHubSettings();
             updateDashboard();
             setCurrentDateTime();
             checkGitHubConnection();
-        };
+        }
 
         function loadData() {
             const stored = localStorage.getItem('crmData');
