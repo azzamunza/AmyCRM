@@ -1,10 +1,30 @@
+name: Build and Deploy Site
+
+on:
+  push:
+    branches:
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create token JS
+        run: |
+          echo "window.GITHUB_TOKEN='${{ secrets.AmyCRMGitHubToken }}';" > token.js
 
       - name: Build site
         run: |
-          echo "window.GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}';" > token.js
-          # Continue building HTML or JS
+          # example: copy HTML + JS to 'dist' folder
+          mkdir -p dist
+          cp -r *.html *.js token.js dist/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
