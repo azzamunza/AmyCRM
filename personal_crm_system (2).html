@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Provider CRM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .sync-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .sync-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .sync-indicator.syncing {
+            background: #fbbf24;
+        }
+
+        .sync-indicator.error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #495057;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            background: #e9ecef;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="date"],
+        input[type="time"],
+        input[type="password"],
+        input[type="file"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .card-meta {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-provider {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-worker {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .badge-high {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .badge-medium {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .badge-low {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            opacity: 0.9;
+            font-size: 1em;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .setup-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .setup-card h3 {
+            margin-bottom: 15px;
+        }
+
+        .setup-card ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .setup-card a {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-tabs {
+                flex-wrap: nowrap;
+            }
+
+            .nav-tab {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Personal Provider CRM</h1>
+            <p>Manage communications, documents, and incidents with your providers and support workers</p>
+            <div class="sync-status" id="syncStatus">
+                <span class="sync-indicator" id="syncIndicator"></span>
+                <span id="syncText">Not connected</span>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">Dashboard</button>
+            <button class="nav-tab" onclick="showTab('contacts')">Contacts</button>
+            <button class="nav-tab" onclick="showTab('communications')">Communications</button>
+            <button class="nav-tab" onclick="showTab('documents')">Documents</button>
+            <button class="nav-tab" onclick="showTab('incidents')">Incident Reports</button>
+            <button class="nav-tab" onclick="showTab('settings')">GitHub Settings</button>
+        </div>
+
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <h2>Dashboard Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalContacts">0</div>
+                        <div class="stat-label">Total Contacts</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalCommunications">0</div>
+                        <div class="stat-label">Communications</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalDocuments">0</div>
+                        <div class="stat-label">Documents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalIncidents">0</div>
+                        <div class="stat-label">Incident Reports</div>
+                    </div>
+                </div>
+
+                <h3>Recent Activity</h3>
+                <div id="recentActivity"></div>
+            </div>
+
+            <!-- Contacts Tab -->
+            <div id="contacts" class="tab-content">
+                <h2>Contacts</h2>
+                <button class="btn btn-primary" onclick="showAddContactForm()">+ Add New Contact</button>
+                
+                <div id="addContactForm" style="display:none; margin-top: 20px;">
+                    <div class="card">
+                        <h3>Add New Contact</h3>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Full Name *</label>
+                                <input type="text" id="contactName" placeholder="John Smith">
+                            </div>
+                            <div class="form-group">
+                                <label>Type *</label>
+                                <select id="contactType">
+                                    <option value="provider">Provider</option>
+                                    <option value="support-worker">Support Worker</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" id="contactPhone" placeholder="(555) 123-4567">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="contactEmail" placeholder="john.smith@example.com">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Organization</label>
+                            <input type="text" id="contactOrg" placeholder="ABC Healthcare Services">
+                        </div>
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea id="contactNotes" placeholder="Additional information about this contact..."></textarea>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="saveContact()">Save Contact</button>
+                            <button class="btn btn-secondary" onclick="cancelContactForm()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="contactSearch" placeholder="🔍 Search contacts..." onkeyup="filterContacts()">
+                </div>
+
+                <div id="contactsList"></div>
+            </div>
+
+            <!-- Communications Tab -->
+            <div id="communications" class="tab-content">
+                <h2>Communications Log</h2>
+                <button class="btn btn-primary" onclick="showAddCommunicationForm()">+ Log New Communication</button>
+                
+                <div id="addCommunicationForm" style="display:none; margin-top: 20px;">
+                    <div class="card">
+                        <h3>Log New Communication</h3>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Date *</label>
+                                <input type="date" id="commDate">
+                            </div>
+                            <div class="form-group">
+                                <label>Time *</label>
+                                <input type="time" id="commTime">
+                            </div>
+                        </div>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Contact *</label>
+                                <select id="commContact"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Method *</label>
+                                <select id="commMethod">
+                                    <option value="phone">Phone Call</option>
+                                    <option value="email">Email</option>
+                                    <option value="in-person">In-Person</option>
+                                    <option value="text">Text Message</option>
+                                    <option value="video">Video Call</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Subject *</label>
+                            <input type="text" id="commSubject" placeholder="Brief subject of communication">
+                        </div>
+                        <div class="form-group">
+                            <label>Details *</label>
+                            <textarea id="commDetails" placeholder="Detailed notes about this communication..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Follow-up Required?</label>
+                            <select id="commFollowup">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="saveCommunication()">Save Communication</button>
+                            <button class="btn btn-secondary" onclick="cancelCommunicationForm()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="commSearch" placeholder="🔍 Search communications..." onkeyup="filterCommunications()">
+                </div>
+
+                <div id="communicationsList"></div>
+            </div>
+
+            <!-- Documents Tab -->
+            <div id="documents" class="tab-content">
+                <h2>Document Management</h2>
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Documents are stored as base64 encoded data. Large files may take time to sync to GitHub.
+                </div>
+                <button class="btn btn-primary" onclick="showAddDocumentForm()">+ Upload Document</button>
+                
+                <div id="addDocumentForm" style="display:none; margin-top: 20px;">
+                    <div class="card">
+                        <h3>Upload New Document</h3>
+                        <div class="form-group">
+                            <label>Document Title *</label>
+                            <input type="text" id="docTitle" placeholder="e.g., Care Plan 2024">
+                        </div>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Category *</label>
+                                <select id="docCategory">
+                                    <option value="care-plan">Care Plan</option>
+                                    <option value="medical">Medical Records</option>
+                                    <option value="contract">Contract</option>
+                                    <option value="invoice">Invoice</option>
+                                    <option value="correspondence">Correspondence</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Related Contact</label>
+                                <select id="docContact">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>File *</label>
+                            <input type="file" id="docFile" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                        </div>
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea id="docNotes" placeholder="Additional notes about this document..."></textarea>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="saveDocument()">Upload Document</button>
+                            <button class="btn btn-secondary" onclick="cancelDocumentForm()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="docSearch" placeholder="🔍 Search documents..." onkeyup="filterDocuments()">
+                </div>
+
+                <div id="documentsList"></div>
+            </div>
+
+            <!-- Incidents Tab -->
+            <div id="incidents" class="tab-content">
+                <h2>Incident Reports</h2>
+                <button class="btn btn-primary" onclick="showAddIncidentForm()">+ Report New Incident</button>
+                
+                <div id="addIncidentForm" style="display:none; margin-top: 20px;">
+                    <div class="card">
+                        <h3>New Incident Report</h3>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Incident Date *</label>
+                                <input type="date" id="incidentDate">
+                            </div>
+                            <div class="form-group">
+                                <label>Incident Time *</label>
+                                <input type="time" id="incidentTime">
+                            </div>
+                        </div>
+                        <div class="grid">
+                            <div class="form-group">
+                                <label>Severity *</label>
+                                <select id="incidentSeverity">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Related Contact</label>
+                                <select id="incidentContact">
+                                    <option value="">None</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Incident Type *</label>
+                            <select id="incidentType">
+                                <option value="service-issue">Service Issue</option>
+                                <option value="safety">Safety Concern</option>
+                                <option value="communication">Communication Breakdown</option>
+                                <option value="medication">Medication Error</option>
+                                <option value="behavioral">Behavioral Incident</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" id="incidentLocation" placeholder="Where did the incident occur?">
+                        </div>
+                        <div class="form-group">
+                            <label>Description *</label>
+                            <textarea id="incidentDescription" placeholder="Detailed description of what happened..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Action Taken</label>
+                            <textarea id="incidentAction" placeholder="What actions were taken in response?"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Witnesses</label>
+                            <input type="text" id="incidentWitnesses" placeholder="Names of any witnesses">
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-primary" onclick="saveIncident()">Submit Report</button>
+                            <button class="btn btn-secondary" onclick="cancelIncidentForm()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="incidentSearch" placeholder="🔍 Search incidents..." onkeyup="filterIncidents()">
+                </div>
+
+                <div id="incidentsList"></div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <h2>GitHub Automatic Sync Settings</h2>
+                
+                <div class="setup-card">
+                    <h3>📚 Setup Instructions</h3>
+                    <ol>
+                        <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)</a></li>
+                        <li>Click "Generate new token (classic)"</li>
+                        <li>Give it a name like "CRM Data Sync"</li>
+                        <li>Select scopes: <strong>repo</strong> (all repo permissions)</li>
+                        <li>Click "Generate token" and copy it immediately</li>
+                        <li>Create a new <strong>private</strong> repository on GitHub (e.g., "personal-crm-data")</li>
+                        <li>Enter your details below to enable automatic syncing</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3>GitHub Configuration</h3>
+                    <div class="form-group">
+                        <label>GitHub Username *</label>
+                        <input type="text" id="githubUsername" placeholder="yourusername">
+                    </div>
+                    <div class="form-group">
+                        <label>Repository Name *</label>
+                        <input type="text" id="githubRepo" placeholder="personal-crm-data">
+                    </div>
+                    <div class="form-group">
+                        <label>Personal Access Token *</label>
+                        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
+                        <small style="color: #666; display: block; margin-top: 5px;">Your token is stored locally in your browser and never shared.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Data File Name</label>
+                        <input type="text" id="githubFilename" placeholder="crm-data.json" value="crm-data.json">
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-success" onclick="saveGitHubSettings()">💾 Save Settings</button>
+                        <button class="btn btn-primary" onclick="testGitHubConnection()">🔌 Test Connection</button>
+                        <button class="btn btn-primary" onclick="manualSync()">🔄 Manual Sync Now</button>
+                        <button class="btn btn-danger" onclick="clearGitHubSettings()">Clear Settings</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Sync Options</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="autoSync" onchange="toggleAutoSync()"> 
+                            Enable Automatic Sync (syncs after every change)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Last Sync: <span id="lastSync">Never</span></label>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Manual Backup</h3>
+                    <p>If you prefer not to use automatic GitHub sync, you can manually export and import your data:</p>
+                    <div class="button-group">
+                        <button class="btn btn-success" onclick="exportData()">📥 Export Data</button>
+                        <button class="btn btn-primary" onclick="document.getElementById('importFile').click()">📤 Import Data</button>
+                        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+                    </div>
+                </div>
+
+                <div id="settingsMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Storage
+        let data = {
+            contacts: [],
+            communications: [],
+            documents: [],
+            incidents: [],
+            lastUpdated: null
+        };
+
+        let githubConfig = {
+            username: '',
+            repo: '',
+            token: '',
+            filename: 'crm-data.json',
+            autoSync: false
+        };
+
+        let isSyncing = false;
+
+        // Load data on page load
+        window.onload = function() {
+            loadData();
+            loadGitHubSettings();
+            updateDashboard();
+            setCurrentDateTime();
+            checkGitHubConnection();
+        };
+
+        function loadData() {
+            const stored = localStorage.getItem('crmData');
+            if (stored) {
+                data = JSON.parse(stored);
+                updateAllLists();
+                updateDashboard();
+            }
+        }
+
+        function saveData() {
+            data.lastUpdated = new Date().toISOString();
+            localStorage.setItem('crmData', JSON.stringify(data));
+            updateDashboard();
+            
+            // Auto-sync to GitHub if enabled
+            if (githubConfig.autoSync && githubConfig.token) {
+                syncToGitHub();
+            }
+        }
+
+        // GitHub Functions
+        function loadGitHubSettings() {
+            const stored = localStorage.getItem('githubConfig');
+            if (stored) {
+                githubConfig = JSON.parse(stored);
+                document.getElementById('githubUsername').value = githubConfig.username || '';
+                document.getElementById('githubRepo').value = githubConfig.repo || '';
+                document.getElementById('githubToken').value = githubConfig.token || '';
+                document.getElementById('githubFilename').value = githubConfig.filename || 'crm-data.json';
+                document.getElementById('autoSync').checked = githubConfig.autoSync || false;
+                
+                if (githubConfig.lastSync) {
+                    document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
+                }
+            }
+        }
+
+        function saveGitHubSettings() {
+            githubConfig.username = document.getElementById('githubUsername').value.trim();
+            githubConfig.repo = document.getElementById('githubRepo').value.trim();
+            githubConfig.token = document.getElementById('githubToken').value.trim();
+            githubConfig.filename = document.getElementById('githubFilename').value.trim() || 'crm-data.json';
+
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                showMessage('Please fill in all required fields', 'danger');
+                return;
+            }
+
+            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+            showMessage('GitHub settings saved successfully!', 'success');
+            updateSyncStatus('connected');
+        }
+
+        function clearGitHubSettings() {
+            if (confirm('Are you sure you want to clear GitHub settings?')) {
+                githubConfig = {
+                    username: '',
+                    repo: '',
+                    token: '',
+                    filename: 'crm-data.json',
+                    autoSync: false
+                };
+                localStorage.removeItem('githubConfig');
+                document.getElementById('githubUsername').value =
