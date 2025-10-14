@@ -780,37 +780,42 @@
         </div>
     </div>
     
-       <!-- Google Sign-In -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
+  <!-- Google Sign-In -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <script>
-    // --- Authorised Users ---
+<!-- Load jwt-decode safely (no async/defer) -->
+<script src="https://cdn.jsdelivr.net/npm/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
+
+<script>
+  // Wait until jwt-decode is defined before doing anything
+  window.addEventListener("load", () => {
+    if (typeof jwt_decode !== "function") {
+      console.error("jwt-decode library failed to load.");
+      return;
+    }
+
     const allowedEmails = [
       "azzamunza@gmail.com",
       "amp41286@gmail.com"
     ];
 
-  // ✅ Define callback FIRST
-  function handleCredentialResponse(response) {
-    const data = jwt_decode(response.credential);
-    const email = data.email;
+    function handleCredentialResponse(response) {
+      const data = jwt_decode(response.credential);
+      const email = data.email;
 
-    if (allowedEmails.includes(email)) {
-      document.body.style.display = "block";      // Show CRM
-      document.getElementById("signin").style.display = "none";
-      initCRM();                                  // Start your CRM logic
-    } else {
-      alert("Access denied for " + email);
-      google.accounts.id.disableAutoSelect();
+      if (allowedEmails.includes(email)) {
+        document.body.style.display = "block";
+        document.getElementById("signin").style.display = "none";
+        initCRM();
+      } else {
+        alert("Access denied for " + email);
+        google.accounts.id.disableAutoSelect();
+      }
     }
-  }
 
-  // ✅ Initialize Google Identity AFTER defining callback
-  window.onload = function() {
     google.accounts.id.initialize({
       client_id: "957511612141-hk0pp224v1cqe9sv5khq6u6b40plnnje.apps.googleusercontent.com",
-      callback: handleCredentialResponse  // Must match the function name above
+      callback: handleCredentialResponse
     });
 
     google.accounts.id.renderButton(
@@ -818,8 +823,8 @@
       { theme: "filled_blue", size: "large" }
     );
 
-    google.accounts.id.prompt(); // Shows one-tap prompt if possible
-  };
+    google.accounts.id.prompt();
+  });
 
     // ========================
     // == CRM CORE FUNCTIONS ==
