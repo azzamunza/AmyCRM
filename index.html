@@ -385,6 +385,17 @@
             text-decoration: underline;
         }
 
+        #signin {
+            text-align: center;
+            padding: 100px 20px;
+            color: white;
+        }
+
+        #signin h2 {
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8em;
@@ -407,15 +418,16 @@
 </head>
 <body style="display:none;">
     <div id="signin">
-  <p style="text-align:center;color:white;margin-bottom:10px;">Sign in with Google to access your CRM</p>
-</div> <!-- Placeholder for login button -->    
+        <h2>🔐 Sign in to access your CRM</h2>
+        <p style="margin-bottom:20px;">Only authorized users can access this application</p>
+    </div>
+    
     <div id="g_id_onload"
          data-client_id="957511612141-hk0pp224v1cqe9sv5khq6u6b40plnnje.apps.googleusercontent.com"
          data-callback="handleCredentialResponse">
     </div>
 
-    <div class="g_id_signin" data-type="standard"></div>
-    <div class="container">
+    <div class="container" style="display:none;" id="mainApp">
         <div class="header">
             <h1>📋 Personal Provider CRM</h1>
             <p>Manage communications, documents, and incidents with your providers and support workers</p>
@@ -737,7 +749,7 @@
                     </div>
                     <div class="form-group">
                         <label>Personal Access Token *</label>
-                        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
+                        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
                         <small style="color: #666; display: block; margin-top: 5px;">Your token is stored locally in your browser and never shared.</small>
                     </div>
                     <div class="form-group">
@@ -780,203 +792,884 @@
         </div>
     </div>
     
-  <!-- Google Sign-In -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google Sign-In -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-<!-- Load jwt-decode safely (no async/defer) -->
-<script src="https://unpkg.com/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
+    <!-- Load jwt-decode from CDN (correct path) -->
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
 
+    <script>
+        // Define the callback function BEFORE Google Sign-In initializes
+        const allowedEmails = [
+            "azzamunza@gmail.com",
+            "amp41286@gmail.com"
+        ];
 
-<script>
-  // Wait until jwt-decode is defined before doing anything
-  window.addEventListener("load", () => {
-    if (typeof jwt_decode !== "function") {
-      console.error("jwt-decode library failed to load.");
-      return;
-    }
+        function handleCredentialResponse(response) {
+            try {
+                const data = jwt_decode(response.credential);
+                const email = data.email;
 
-    const allowedEmails = [
-      "azzamunza@gmail.com",
-      "amp41286@gmail.com"
-    ];
-
-    function handleCredentialResponse(response) {
-      const data = jwt_decode(response.credential);
-      const email = data.email;
-
-      if (allowedEmails.includes(email)) {
-        document.body.style.display = "block";
-        document.getElementById("signin").style.display = "none";
-        initCRM();
-      } else {
-        alert("Access denied for " + email);
-        google.accounts.id.disableAutoSelect();
-      }
-    }
-
-    google.accounts.id.initialize({
-      client_id: "957511612141-hk0pp224v1cqe9sv5khq6u6b40plnnje.apps.googleusercontent.com",
-      callback: handleCredentialResponse
-    });
-
-    google.accounts.id.renderButton(
-      document.getElementById("signin"),
-      { theme: "filled_blue", size: "large" }
-    );
-
-    google.accounts.id.prompt();
-  });
-
-    // ========================
-    // == CRM CORE FUNCTIONS ==
-    // ========================
-
-    let data = {
-      contacts: [],
-      communications: [],
-      documents: [],
-      incidents: [],
-      lastUpdated: null
-    };
-
-    let githubConfig = {
-      username: '',
-      repo: '',
-      token: '',
-      filename: 'crm-data.json',
-      autoSync: false
-    };
-
-    let isSyncing = false;
-
-    // --- Initialise CRM after login ---
-    function initCRM() {
-      loadData();
-      loadGitHubSettings();
-      updateDashboard();
-      setCurrentDateTime();
-      checkGitHubConnection();
-    }
-
-    // --- Data Management ---
-    function loadData() {
-      const stored = localStorage.getItem('crmData');
-      if (stored) {
-        data = JSON.parse(stored);
-        updateAllLists();
-        updateDashboard();
-      }
-    }
-
-    function saveData() {
-      data.lastUpdated = new Date().toISOString();
-      localStorage.setItem('crmData', JSON.stringify(data));
-      updateDashboard();
-
-      if (githubConfig.autoSync && githubConfig.token) {
-        syncToGitHub();
-      }
-    }
-
-    // --- GitHub Configuration ---
-    function loadGitHubSettings() {
-      const stored = localStorage.getItem('githubConfig');
-      if (stored) {
-        githubConfig = JSON.parse(stored);
-        document.getElementById('githubUsername').value = githubConfig.username || '';
-        document.getElementById('githubRepo').value = githubConfig.repo || '';
-        document.getElementById('githubToken').value = githubConfig.token || '';
-        document.getElementById('githubFilename').value = githubConfig.filename || 'crm-data.json';
-        document.getElementById('autoSync').checked = githubConfig.autoSync || false;
-
-        if (githubConfig.lastSync) {
-          document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
+                if (allowedEmails.includes(email)) {
+                    document.body.style.display = "block";
+                    document.getElementById("signin").style.display = "none";
+                    document.getElementById("mainApp").style.display = "block";
+                    initCRM();
+                } else {
+                    alert("Access denied for " + email);
+                    google.accounts.id.disableAutoSelect();
+                }
+            } catch (error) {
+                console.error("Error decoding JWT:", error);
+                alert("Authentication error. Please try again.");
+            }
         }
-      }
-    }
 
-    function saveGitHubSettings() {
-      githubConfig.username = document.getElementById('githubUsername').value.trim();
-      githubConfig.repo = document.getElementById('githubRepo').value.trim();
-      githubConfig.token = document.getElementById('githubToken').value.trim();
-      githubConfig.filename = document.getElementById('githubFilename').value.trim() || 'crm-data.json';
+        // ========================
+        // == CRM CORE FUNCTIONS ==
+        // ========================
 
-      if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
-        showMessage('Please fill in all required fields', 'danger');
-        return;
-      }
-
-      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-      showMessage('GitHub settings saved successfully!', 'success');
-      updateSyncStatus('connected');
-    }
-
-    function clearGitHubSettings() {
-      if (confirm('Are you sure you want to clear GitHub settings?')) {
-        githubConfig = {
-          username: '',
-          repo: '',
-          token: '',
-          filename: 'crm-data.json',
-          autoSync: false
+        let data = {
+            contacts: [],
+            communications: [],
+            documents: [],
+            incidents: [],
+            lastUpdated: null
         };
-        localStorage.removeItem('githubConfig');
-        document.getElementById('githubUsername').value = '';
-        document.getElementById('githubRepo').value = '';
-        document.getElementById('githubToken').value = '';
-        document.getElementById('githubFilename').value = 'crm-data.json';
-        document.getElementById('autoSync').checked = false;
-        document.getElementById('lastSync').textContent = 'Never';
-        updateSyncStatus('disconnected');
-      }
-    }
 
-    // --- Placeholder helper functions ---
-    function showMessage(msg, type) {
-      const el = document.getElementById('settingsMessage');
-      el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
-    }
+        let githubConfig = {
+            username: '',
+            repo: '',
+            token: '',
+            filename: 'crm-data.json',
+            autoSync: false
+        };
 
-    function updateSyncStatus(status) {
-      const indicator = document.getElementById('syncIndicator');
-      const text = document.getElementById('syncText');
-      if (status === 'connected') {
-        indicator.className = 'sync-indicator';
-        text.textContent = 'Connected';
-      } else {
-        indicator.className = 'sync-indicator error';
-        text.textContent = 'Not connected';
-      }
-    }
+        let isSyncing = false;
 
-    function updateDashboard() {
-      document.getElementById('totalContacts').textContent = data.contacts.length;
-      document.getElementById('totalCommunications').textContent = data.communications.length;
-      document.getElementById('totalDocuments').textContent = data.documents.length;
-      document.getElementById('totalIncidents').textContent = data.incidents.length;
-    }
+        // --- Initialize CRM after login ---
+        function initCRM() {
+            loadData();
+            loadGitHubSettings();
+            updateDashboard();
+            setCurrentDateTime();
+            checkGitHubConnection();
+        }
 
-    function setCurrentDateTime() {
-      // placeholder
-    }
+        // --- Data Management ---
+        function loadData() {
+            const stored = localStorage.getItem('crmData');
+            if (stored) {
+                data = JSON.parse(stored);
+                updateAllLists();
+                updateDashboard();
+            }
+        }
 
-    function checkGitHubConnection() {
-      // placeholder - could test repo access here
-    }
+        function saveData() {
+            data.lastUpdated = new Date().toISOString();
+            localStorage.setItem('crmData', JSON.stringify(data));
+            updateDashboard();
 
-    function updateAllLists() {
-      // placeholder - rebuild UI lists
-    }
+            if (githubConfig.autoSync && githubConfig.token) {
+                syncToGitHub();
+            }
+        }
 
-    function syncToGitHub() {
-      // placeholder for GitHub sync logic
-    }
+        // --- GitHub Configuration ---
+        function loadGitHubSettings() {
+            const stored = localStorage.getItem('githubConfig');
+            if (stored) {
+                githubConfig = JSON.parse(stored);
+                document.getElementById('githubUsername').value = githubConfig.username || '';
+                document.getElementById('githubRepo').value = githubConfig.repo || '';
+                document.getElementById('githubToken').value = githubConfig.token || '';
+                document.getElementById('githubFilename').value = githubConfig.filename || 'crm-data.json';
+                document.getElementById('autoSync').checked = githubConfig.autoSync || false;
 
-    function toggleAutoSync() {
-      githubConfig.autoSync = document.getElementById('autoSync').checked;
-      localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
-    }
+                if (githubConfig.lastSync) {
+                    document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
+                }
+            }
+        }
 
+        function saveGitHubSettings() {
+            githubConfig.username = document.getElementById('githubUsername').value.trim();
+            githubConfig.repo = document.getElementById('githubRepo').value.trim();
+            githubConfig.token = document.getElementById('githubToken').value.trim();
+            githubConfig.filename = document.getElementById('githubFilename').value.trim() || 'crm-data.json';
+
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                showMessage('Please fill in all required fields', 'danger');
+                return;
+            }
+
+            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+            showMessage('GitHub settings saved successfully!', 'success');
+            updateSyncStatus('connected');
+        }
+
+        function clearGitHubSettings() {
+            if (confirm('Are you sure you want to clear GitHub settings?')) {
+                githubConfig = {
+                    username: '',
+                    repo: '',
+                    token: '',
+                    filename: 'crm-data.json',
+                    autoSync: false
+                };
+                localStorage.removeItem('githubConfig');
+                document.getElementById('githubUsername').value = '';
+                document.getElementById('githubRepo').value = '';
+                document.getElementById('githubToken').value = '';
+                document.getElementById('githubFilename').value = 'crm-data.json';
+                document.getElementById('autoSync').checked = false;
+                document.getElementById('lastSync').textContent = 'Never';
+                updateSyncStatus('disconnected');
+                showMessage('GitHub settings cleared', 'info');
+            }
+        }
+
+        function toggleAutoSync() {
+            githubConfig.autoSync = document.getElementById('autoSync').checked;
+            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+        }
+
+        // --- GitHub Sync Functions ---
+        async function testGitHubConnection() {
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                showMessage('Please configure GitHub settings first', 'warning');
+                return;
+            }
+
+            updateSyncStatus('syncing');
+            showMessage('Testing connection...', 'info');
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}`, {
+                    headers: {
+                        'Authorization': `token ${githubConfig.token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (response.ok) {
+                    updateSyncStatus('connected');
+                    showMessage('✅ Connection successful! Repository found.', 'success');
+                } else if (response.status === 404) {
+                    updateSyncStatus('error');
+                    showMessage('❌ Repository not found. Please check your username and repository name.', 'danger');
+                } else if (response.status === 401) {
+                    updateSyncStatus('error');
+                    showMessage('❌ Authentication failed. Please check your access token.', 'danger');
+                } else {
+                    updateSyncStatus('error');
+                    showMessage(`❌ Connection failed: ${response.status} ${response.statusText}`, 'danger');
+                }
+            } catch (error) {
+                updateSyncStatus('error');
+                showMessage(`❌ Connection error: ${error.message}`, 'danger');
+            }
+        }
+
+        async function syncToGitHub() {
+            if (isSyncing) return;
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                return;
+            }
+
+            isSyncing = true;
+            updateSyncStatus('syncing');
+
+            try {
+                // Get current file SHA if it exists
+                let sha = null;
+                const getResponse = await fetch(
+                    `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.filename}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${githubConfig.token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                if (getResponse.ok) {
+                    const fileData = await getResponse.json();
+                    sha = fileData.sha;
+                }
+
+                // Create or update file
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+                const putResponse = await fetch(
+                    `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${githubConfig.filename}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${githubConfig.token}`,
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: `Update CRM data - ${new Date().toISOString()}`,
+                            content: content,
+                            sha: sha
+                        })
+                    }
+                );
+
+                if (putResponse.ok) {
+                    githubConfig.lastSync = new Date().toISOString();
+                    localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+                    document.getElementById('lastSync').textContent = new Date(githubConfig.lastSync).toLocaleString();
+                    updateSyncStatus('connected');
+                } else {
+                    const errorData = await putResponse.json();
+                    console.error('Sync failed:', errorData);
+                    updateSyncStatus('error');
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateSyncStatus('error');
+            } finally {
+                isSyncing = false;
+            }
+        }
+
+        async function manualSync() {
+            if (!githubConfig.username || !githubConfig.repo || !githubConfig.token) {
+                showMessage('Please configure GitHub settings first', 'warning');
+                return;
+            }
+
+            showMessage('Syncing to GitHub...', 'info');
+            await syncToGitHub();
+            
+            if (githubConfig.lastSync) {
+                showMessage('✅ Sync completed successfully!', 'success');
+            } else {
+                showMessage('❌ Sync failed. Please check your settings and try again.', 'danger');
+            }
+        }
+
+        // --- Helper Functions ---
+        function showMessage(msg, type) {
+            const el = document.getElementById('settingsMessage');
+            el.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+            setTimeout(() => {
+                el.innerHTML = '';
+            }, 5000);
+        }
+
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('syncIndicator');
+            const text = document.getElementById('syncText');
+            
+            indicator.className = 'sync-indicator';
+            
+            if (status === 'connected') {
+                text.textContent = 'Connected';
+            } else if (status === 'syncing') {
+                indicator.className = 'sync-indicator syncing';
+                text.textContent = 'Syncing...';
+            } else {
+                indicator.className = 'sync-indicator error';
+                text.textContent = 'Not connected';
+            }
+        }
+
+        function updateDashboard() {
+            document.getElementById('totalContacts').textContent = data.contacts.length;
+            document.getElementById('totalCommunications').textContent = data.communications.length;
+            document.getElementById('totalDocuments').textContent = data.documents.length;
+            document.getElementById('totalIncidents').textContent = data.incidents.length;
+
+            // Show recent activity
+            displayRecentActivity();
+        }
+
+        function displayRecentActivity() {
+            const container = document.getElementById('recentActivity');
+            const allActivities = [];
+
+            // Collect all activities with timestamps
+            data.contacts.forEach(c => {
+                allActivities.push({
+                    type: 'contact',
+                    date: c.dateAdded || new Date().toISOString(),
+                    text: `Added contact: ${c.name}`
+                });
+            });
+
+            data.communications.forEach(c => {
+                allActivities.push({
+                    type: 'communication',
+                    date: c.timestamp || new Date().toISOString(),
+                    text: `Communication with ${c.contactName}: ${c.subject}`
+                });
+            });
+
+            data.documents.forEach(d => {
+                allActivities.push({
+                    type: 'document',
+                    date: d.uploadDate || new Date().toISOString(),
+                    text: `Uploaded document: ${d.title}`
+                });
+            });
+
+            data.incidents.forEach(i => {
+                allActivities.push({
+                    type: 'incident',
+                    date: i.timestamp || new Date().toISOString(),
+                    text: `Incident reported: ${i.type} (${i.severity})`
+                });
+            });
+
+            // Sort by date descending
+            allActivities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            // Display top 10
+            const recent = allActivities.slice(0, 10);
+            
+            if (recent.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>No activity yet</p></div>';
+                return;
+            }
+
+            container.innerHTML = recent.map(activity => `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>${activity.text}</span>
+                        <span class="card-meta">${new Date(activity.date).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setCurrentDateTime() {
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            const timeStr = now.toTimeString().slice(0, 5);
+            
+            const dateInputs = ['commDate', 'incidentDate'];
+            const timeInputs = ['commTime', 'incidentTime'];
+            
+            dateInputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.value) el.value = dateStr;
+            });
+            
+            timeInputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !el.value) el.value = timeStr;
+            });
+        }
+
+        function checkGitHubConnection() {
+            if (githubConfig.token && githubConfig.username && githubConfig.repo) {
+                updateSyncStatus('connected');
+            } else {
+                updateSyncStatus('disconnected');
+            }
+        }
+
+        function updateAllLists() {
+            displayContacts();
+            displayCommunications();
+            displayDocuments();
+            displayIncidents();
+        }
+
+        // --- Tab Navigation ---
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Update datetime when switching to forms
+            if (tabName === 'communications' || tabName === 'incidents') {
+                setCurrentDateTime();
+            }
+        }
+
+        // --- Contact Functions ---
+        function showAddContactForm() {
+            document.getElementById('addContactForm').style.display = 'block';
+            document.getElementById('contactName').focus();
+        }
+
+        function cancelContactForm() {
+            document.getElementById('addContactForm').style.display = 'none';
+            clearContactForm();
+        }
+
+        function clearContactForm() {
+            document.getElementById('contactName').value = '';
+            document.getElementById('contactType').value = 'provider';
+            document.getElementById('contactPhone').value = '';
+            document.getElementById('contactEmail').value = '';
+            document.getElementById('contactOrg').value = '';
+            document.getElementById('contactNotes').value = '';
+        }
+
+        function saveContact() {
+            const name = document.getElementById('contactName').value.trim();
+            const type = document.getElementById('contactType').value;
+
+            if (!name) {
+                alert('Please enter a contact name');
+                return;
+            }
+
+            const contact = {
+                id: Date.now(),
+                name: name,
+                type: type,
+                phone: document.getElementById('contactPhone').value.trim(),
+                email: document.getElementById('contactEmail').value.trim(),
+                organization: document.getElementById('contactOrg').value.trim(),
+                notes: document.getElementById('contactNotes').value.trim(),
+                dateAdded: new Date().toISOString()
+            };
+
+            data.contacts.push(contact);
+            saveData();
+            displayContacts();
+            updateContactDropdowns();
+            cancelContactForm();
+        }
+
+        function displayContacts() {
+            const container = document.getElementById('contactsList');
+            
+            if (data.contacts.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><p>No contacts yet. Add your first contact to get started!</p></div>';
+                return;
+            }
+
+            container.innerHTML = data.contacts.map(contact => `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">${contact.name}</div>
+                            <span class="badge badge-${contact.type === 'provider' ? 'provider' : 'worker'}">${contact.type === 'provider' ? 'Provider' : 'Support Worker'}</span>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-sm btn-danger" onclick="deleteContact(${contact.id})">Delete</button>
+                        </div>
+                    </div>
+                    ${contact.organization ? `<p><strong>Organization:</strong> ${contact.organization}</p>` : ''}
+                    ${contact.phone ? `<p><strong>Phone:</strong> ${contact.phone}</p>` : ''}
+                    ${contact.email ? `<p><strong>Email:</strong> ${contact.email}</p>` : ''}
+                    ${contact.notes ? `<p><strong>Notes:</strong> ${contact.notes}</p>` : ''}
+                    <p class="card-meta">Added: ${new Date(contact.dateAdded).toLocaleDateString()}</p>
+                </div>
+            `).join('');
+        }
+
+        function deleteContact(id) {
+            if (confirm('Are you sure you want to delete this contact?')) {
+                data.contacts = data.contacts.filter(c => c.id !== id);
+                saveData();
+                displayContacts();
+                updateContactDropdowns();
+            }
+        }
+
+        function filterContacts() {
+            const searchTerm = document.getElementById('contactSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('#contactsList .card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        function updateContactDropdowns() {
+            const selects = ['commContact', 'docContact', 'incidentContact'];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                const currentValue = select.value;
+                
+                const options = data.contacts.map(c => 
+                    `<option value="${c.id}">${c.name} (${c.type})</option>`
+                ).join('');
+                
+                if (selectId === 'commContact') {
+                    select.innerHTML = '<option value="">Select a contact</option>' + options;
+                } else {
+                    select.innerHTML = '<option value="">None</option>' + options;
+                }
+                
+                select.value = currentValue;
+            });
+        }
+
+        // --- Communication Functions ---
+        function showAddCommunicationForm() {
+            document.getElementById('addCommunicationForm').style.display = 'block';
+            updateContactDropdowns();
+            setCurrentDateTime();
+        }
+
+        function cancelCommunicationForm() {
+            document.getElementById('addCommunicationForm').style.display = 'none';
+            clearCommunicationForm();
+        }
+
+        function clearCommunicationForm() {
+            document.getElementById('commDate').value = '';
+            document.getElementById('commTime').value = '';
+            document.getElementById('commContact').value = '';
+            document.getElementById('commMethod').value = 'phone';
+            document.getElementById('commSubject').value = '';
+            document.getElementById('commDetails').value = '';
+            document.getElementById('commFollowup').value = 'no';
+        }
+
+        function saveCommunication() {
+            const date = document.getElementById('commDate').value;
+            const time = document.getElementById('commTime').value;
+            const contactId = document.getElementById('commContact').value;
+            const subject = document.getElementById('commSubject').value.trim();
+            const details = document.getElementById('commDetails').value.trim();
+
+            if (!date || !time || !contactId || !subject || !details) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const contact = data.contacts.find(c => c.id == contactId);
+            
+            const communication = {
+                id: Date.now(),
+                timestamp: `${date}T${time}`,
+                contactId: contactId,
+                contactName: contact ? contact.name : 'Unknown',
+                method: document.getElementById('commMethod').value,
+                subject: subject,
+                details: details,
+                followup: document.getElementById('commFollowup').value === 'yes'
+            };
+
+            data.communications.push(communication);
+            saveData();
+            displayCommunications();
+            cancelCommunicationForm();
+        }
+
+        function displayCommunications() {
+            const container = document.getElementById('communicationsList');
+            
+            if (data.communications.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><p>No communications logged yet.</p></div>';
+                return;
+            }
+
+            // Sort by date descending
+            const sorted = [...data.communications].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            container.innerHTML = sorted.map(comm => `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">${comm.subject}</div>
+                            <span class="card-meta">${new Date(comm.timestamp).toLocaleString()}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCommunication(${comm.id})">Delete</button>
+                    </div>
+                    <p><strong>Contact:</strong> ${comm.contactName}</p>
+                    <p><strong>Method:</strong> ${comm.method}</p>
+                    <p><strong>Details:</strong> ${comm.details}</p>
+                    ${comm.followup ? '<p><span class="badge badge-high">Follow-up Required</span></p>' : ''}
+                </div>
+            `).join('');
+        }
+
+        function deleteCommunication(id) {
+            if (confirm('Are you sure you want to delete this communication?')) {
+                data.communications = data.communications.filter(c => c.id !== id);
+                saveData();
+                displayCommunications();
+            }
+        }
+
+        function filterCommunications() {
+            const searchTerm = document.getElementById('commSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('#communicationsList .card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // --- Document Functions ---
+        function showAddDocumentForm() {
+            document.getElementById('addDocumentForm').style.display = 'block';
+            updateContactDropdowns();
+        }
+
+        function cancelDocumentForm() {
+            document.getElementById('addDocumentForm').style.display = 'none';
+            clearDocumentForm();
+        }
+
+        function clearDocumentForm() {
+            document.getElementById('docTitle').value = '';
+            document.getElementById('docCategory').value = 'care-plan';
+            document.getElementById('docContact').value = '';
+            document.getElementById('docFile').value = '';
+            document.getElementById('docNotes').value = '';
+        }
+
+        async function saveDocument() {
+            const title = document.getElementById('docTitle').value.trim();
+            const category = document.getElementById('docCategory').value;
+            const fileInput = document.getElementById('docFile');
+
+            if (!title || !fileInput.files[0]) {
+                alert('Please provide a title and select a file');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            
+            // Read file as base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const contactId = document.getElementById('docContact').value;
+                const contact = data.contacts.find(c => c.id == contactId);
+
+                const document = {
+                    id: Date.now(),
+                    title: title,
+                    category: category,
+                    contactId: contactId,
+                    contactName: contact ? contact.name : '',
+                    filename: file.name,
+                    fileType: file.type,
+                    fileData: e.target.result,
+                    notes: document.getElementById('docNotes').value.trim(),
+                    uploadDate: new Date().toISOString()
+                };
+
+                data.documents.push(document);
+                saveData();
+                displayDocuments();
+                cancelDocumentForm();
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function displayDocuments() {
+            const container = document.getElementById('documentsList');
+            
+            if (data.documents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div><p>No documents uploaded yet.</p></div>';
+                return;
+            }
+
+            container.innerHTML = data.documents.map(doc => `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">${doc.title}</div>
+                            <span class="card-meta">${doc.filename}</span>
+                        </div>
+                        <div class="button-group">
+                            <button class="btn btn-sm btn-primary" onclick="downloadDocument(${doc.id})">Download</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteDocument(${doc.id})">Delete</button>
+                        </div>
+                    </div>
+                    <p><strong>Category:</strong> ${doc.category}</p>
+                    ${doc.contactName ? `<p><strong>Related to:</strong> ${doc.contactName}</p>` : ''}
+                    ${doc.notes ? `<p><strong>Notes:</strong> ${doc.notes}</p>` : ''}
+                    <p class="card-meta">Uploaded: ${new Date(doc.uploadDate).toLocaleDateString()}</p>
+                </div>
+            `).join('');
+        }
+
+        function downloadDocument(id) {
+            const doc = data.documents.find(d => d.id === id);
+            if (!doc) return;
+
+            const link = document.createElement('a');
+            link.href = doc.fileData;
+            link.download = doc.filename;
+            link.click();
+        }
+
+        function deleteDocument(id) {
+            if (confirm('Are you sure you want to delete this document?')) {
+                data.documents = data.documents.filter(d => d.id !== id);
+                saveData();
+                displayDocuments();
+            }
+        }
+
+        function filterDocuments() {
+            const searchTerm = document.getElementById('docSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('#documentsList .card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // --- Incident Functions ---
+        function showAddIncidentForm() {
+            document.getElementById('addIncidentForm').style.display = 'block';
+            updateContactDropdowns();
+            setCurrentDateTime();
+        }
+
+        function cancelIncidentForm() {
+            document.getElementById('addIncidentForm').style.display = 'none';
+            clearIncidentForm();
+        }
+
+        function clearIncidentForm() {
+            document.getElementById('incidentDate').value = '';
+            document.getElementById('incidentTime').value = '';
+            document.getElementById('incidentSeverity').value = 'low';
+            document.getElementById('incidentContact').value = '';
+            document.getElementById('incidentType').value = 'service-issue';
+            document.getElementById('incidentLocation').value = '';
+            document.getElementById('incidentDescription').value = '';
+            document.getElementById('incidentAction').value = '';
+            document.getElementById('incidentWitnesses').value = '';
+        }
+
+        function saveIncident() {
+            const date = document.getElementById('incidentDate').value;
+            const time = document.getElementById('incidentTime').value;
+            const description = document.getElementById('incidentDescription').value.trim();
+
+            if (!date || !time || !description) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const contactId = document.getElementById('incidentContact').value;
+            const contact = data.contacts.find(c => c.id == contactId);
+
+            const incident = {
+                id: Date.now(),
+                timestamp: `${date}T${time}`,
+                severity: document.getElementById('incidentSeverity').value,
+                type: document.getElementById('incidentType').value,
+                contactId: contactId,
+                contactName: contact ? contact.name : '',
+                location: document.getElementById('incidentLocation').value.trim(),
+                description: description,
+                action: document.getElementById('incidentAction').value.trim(),
+                witnesses: document.getElementById('incidentWitnesses').value.trim()
+            };
+
+            data.incidents.push(incident);
+            saveData();
+            displayIncidents();
+            cancelIncidentForm();
+        }
+
+        function displayIncidents() {
+            const container = document.getElementById('incidentsList');
+            
+            if (data.incidents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><p>No incidents reported.</p></div>';
+                return;
+            }
+
+            // Sort by date descending
+            const sorted = [...data.incidents].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            container.innerHTML = sorted.map(incident => `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">${incident.type.replace('-', ' ').toUpperCase()}</div>
+                            <span class="badge badge-${incident.severity}">${incident.severity.toUpperCase()}</span>
+                            <span class="card-meta" style="margin-left: 10px;">${new Date(incident.timestamp).toLocaleString()}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="deleteIncident(${incident.id})">Delete</button>
+                    </div>
+                    ${incident.contactName ? `<p><strong>Related to:</strong> ${incident.contactName}</p>` : ''}
+                    ${incident.location ? `<p><strong>Location:</strong> ${incident.location}</p>` : ''}
+                    <p><strong>Description:</strong> ${incident.description}</p>
+                    ${incident.action ? `<p><strong>Action Taken:</strong> ${incident.action}</p>` : ''}
+                    ${incident.witnesses ? `<p><strong>Witnesses:</strong> ${incident.witnesses}</p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function deleteIncident(id) {
+            if (confirm('Are you sure you want to delete this incident report?')) {
+                data.incidents = data.incidents.filter(i => i.id !== id);
+                saveData();
+                displayIncidents();
+            }
+        }
+
+        function filterIncidents() {
+            const searchTerm = document.getElementById('incidentSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('#incidentsList .card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // --- Export/Import Functions ---
+        function exportData() {
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `crm-backup-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (confirm('This will replace all current data. Are you sure?')) {
+                        data = importedData;
+                        saveData();
+                        updateAllLists();
+                        alert('Data imported successfully!');
+                    }
+                } catch (error) {
+                    alert('Error importing data: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
     </script>
 </body>
 </html>
