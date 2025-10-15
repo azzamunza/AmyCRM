@@ -13,15 +13,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Create token JS
+      - name: Create config.js
         run: |
-          echo "window.GITHUB_TOKEN='${{ secrets.AmyCRMGitHubToken }}';" > token.js
+          echo "// Auto-generated config file" > config.js
+          echo "window.CRM_CONFIG = {" >> config.js
+          echo "  GOOGLE_CLIENT_ID: '${{ secrets.GOOGLE_CLIENT_ID }}'," >> config.js
+          echo "  GITHUB_USERNAME: '${{ secrets.CRM_GITHUB_USERNAME }}'," >> config.js
+          echo "  GITHUB_REPO: '${{ secrets.CRM_GITHUB_REPO }}'," >> config.js
+          echo "  USERS_FILE: 'users.json'," >> config.js
+          echo "  DATA_FILE: 'crm-data.json'" >> config.js
+          echo "};" >> config.js
 
       - name: Build site
         run: |
-          # example: copy HTML + JS to 'dist' folder
           mkdir -p dist
-          cp -r *.html *.js token.js dist/
+          cp -r *.html *.js config.js dist/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v6
