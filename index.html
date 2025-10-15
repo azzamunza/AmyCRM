@@ -893,3 +893,429 @@
             const email = document.getElementById('signupEmail').value;
             const phone = document.getElementById('signupPhone').value;
             const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('signupPasswordConfirm').value;
+
+            if (password !== confirmPassword) {
+                showMessage('Passwords do not match', 'danger');
+                return;
+            }
+
+            if (password.length < 8) {
+                showMessage('Password must be at least 8 characters', 'danger');
+                return;
+            }
+
+            try {
+                // Get existing users
+                const users = await fetchUsers();
+                
+                // Check if email already exists
+                if (users.find(u => u.email === email)) {
+                    showMessage('An account with this email already exists', 'danger');
+                    return;
+                }
+
+                // Create new user
+                const newUser = {
+                    id: Date.now(),
+                    name: name,
+                    email: email,
+                    phone: phone,
+                    password: btoa(password), // Base64 encoding (NOT secure for production!)
+                    role: 'user',
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+
+                users.push(newUser);
+                
+                // Save to GitHub
+                await saveUsers(users);
+                
+                showMessage('Access request submitted! An administrator will review your request.', 'success');
+                
+                // Clear form
+                document.getElementById('signupName').value = '';
+                document.getElementById('signupEmail').value = '';
+                document.getElementById('signupPhone').value = '';
+                document.getElementById('signupPassword').value = '';
+                document.getElementById('signupPasswordConfirm').value = '';
+                
+                // Switch back to sign in
+                switchTab('signin');
+                
+            } catch (error) {
+                showMessage('Error creating account: ' + error.message, 'danger');
+            }
+        }
+
+        // Google Sign In
+        async function signInWithGoogle() {
+            if (!CONFIG.GOOGLE_CLIENT_ID) {
+                showMessage('Google Sign-In is not configured', 'warning');
+                return;
+            }
+            // Google Sign-In will trigger handleGoogleSignIn callback
+            google.accounts.id.prompt();
+        }
+
+        async function handleGoogleSignIn(response) {
+            try {
+                // Decode JWT token
+                const data = parseJwt(response.credential);
+                const email = data.email;
+
+                // Get users
+                const users = await fetchUsers();
+                
+                // Check if user exists and is approved
+                let user = users.find(u => u.email === email);
+                
+                if (!user) {
+                    // Auto-approve administrators
+                    const adminEmails = ['azzamunza@gmail.com', 'amp41286@gmail.com'];
+                    
+                    if (adminEmails.includes(email)) {
+                        // Create admin user automatically
+                        user = {
+                            id: Date.now(),
+                            name: data.name,
+                            email: email,
+                            phone: '',
+                            password: '',
+                            role: 'admin',
+                            status: 'approved',
+                            createdAt: new Date().toISOString()
+                        };
+                        users.push(user);
+                        await saveUsers(users);
+                    } else {
+                        showMessage('No account found. Please request access first.', 'warning');
+                        return;
+                    }
+                }
+
+                if (user.status !== 'approved') {
+                    showMessage('Your account is pending approval', 'warning');
+                    return;
+                }
+
+                // Set current user
+                currentUser = {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role
+                };
+
+                localStorage.setItem('userSession', JSON.stringify(currentUser));
+                await loadMainApp();
+                
+            } catch (error) {
+                showMessage('Error with Google Sign-In: ' + error.message, 'danger');
+            }
+        }
+
+        // Parse JWT token
+        function parseJwt(token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        }
+
+        // Load main app
+        async function loadMainApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').classList.add('active');
+            
+            // Set user info
+            document.getElementById('currentUserName').textContent = currentUser.name;
+            document.getElementById('currentUserRole').textContent = currentUser.role === 'admin' ? 'Administrator' : 'User';
+            
+            // Show admin tab if user is admin
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminTab').style.display = 'block';
+                await loadAdminPanel();
+            }
+
+            // Load CRM data
+            await loadCRMData();
+        }
+
+        // Logout
+        function handleLogout() {
+            if (confirm('Are you sure you want to sign out?')) {
+                currentUser = null;
+                localStorage.removeItem('userSession');
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('mainApp').classList.remove('active');
+            }
+        }
+
+        // GitHub API Functions
+        async function fetchUsers() {
+            if (!CONFIG.GITHUB_TOKEN) {
+                throw new Error('GitHub token not configured');
+            }
+
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                if (response.status === 404) {
+                    // File doesn't exist, create with default admins
+                    const defaultUsers = [
+                        {
+                            id: 1,
+                            name: 'Administrator',
+                            email: 'azzamunza@gmail.com',
+                            phone: '',
+                            password: '',
+                            role: 'admin',
+                            status: 'approved',
+                            createdAt: new Date().toISOString()
+                        },
+                        {
+                            id: 2,
+                            name: 'Administrator',
+                            email: 'amp41286@gmail.com',
+                            phone: '',
+                            password: '',
+                            role: 'admin',
+                            status: 'approved',
+                            createdAt: new Date().toISOString()
+                        }
+                    ];
+                    await saveUsers(defaultUsers);
+                    return defaultUsers;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch users');
+                }
+
+                const data = await response.json();
+                const content = atob(data.content);
+                return JSON.parse(content);
+                
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                throw error;
+            }
+        }
+
+        async function saveUsers(users) {
+            if (!CONFIG.GITHUB_TOKEN) {
+                throw new Error('GitHub token not configured');
+            }
+
+            try {
+                // Get current file SHA if it exists
+                let sha = null;
+                const getResponse = await fetch(
+                    `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                if (getResponse.ok) {
+                    const fileData = await getResponse.json();
+                    sha = fileData.sha;
+                }
+
+                // Save users
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify(users, null, 2))));
+                const putResponse = await fetch(
+                    `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: `Update users - ${new Date().toISOString()}`,
+                            content: content,
+                            sha: sha
+                        })
+                    }
+                );
+
+                if (!putResponse.ok) {
+                    throw new Error('Failed to save users');
+                }
+
+                return true;
+                
+            } catch (error) {
+                console.error('Error saving users:', error);
+                throw error;
+            }
+        }
+
+        // Admin Panel Functions
+        async function loadAdminPanel() {
+            try {
+                const users = await fetchUsers();
+                const tbody = document.getElementById('userManagementList');
+                
+                const pendingUsers = users.filter(u => u.status === 'pending');
+                const allUsers = users;
+
+                if (allUsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light);">No users found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = allUsers.map(user => `
+                    <tr>
+                        <td>${user.name}</td>
+                        <td>${user.email}</td>
+                        <td>${user.phone || '-'}</td>
+                        <td>
+                            <span class="badge badge-${user.status === 'approved' ? 'user' : 'pending'}">
+                                ${user.status}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-${user.role === 'admin' ? 'admin' : 'user'}">
+                                ${user.role}
+                            </span>
+                        </td>
+                        <td>
+                            ${user.status === 'pending' ? `
+                                <button class="btn btn-sm btn-success" onclick="approveUser(${user.id})">Approve</button>
+                                <button class="btn btn-sm btn-danger" onclick="denyUser(${user.id})">Deny</button>
+                            ` : `
+                                ${user.email !== 'azzamunza@gmail.com' && user.email !== 'amp41286@gmail.com' ? `
+                                    <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">Delete</button>
+                                    ${user.role === 'user' ? `
+                                        <button class="btn btn-sm btn-primary" onclick="makeAdmin(${user.id})">Make Admin</button>
+                                    ` : ''}
+                                ` : '<span style="color: var(--text-light);">Protected</span>'}
+                            `}
+                        </td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading admin panel:', error);
+            }
+        }
+
+        async function approveUser(userId) {
+            try {
+                const users = await fetchUsers();
+                const user = users.find(u => u.id === userId);
+                
+                if (user) {
+                    user.status = 'approved';
+                    await saveUsers(users);
+                    await loadAdminPanel();
+                    alert(`User ${user.name} has been approved!`);
+                }
+            } catch (error) {
+                alert('Error approving user: ' + error.message);
+            }
+        }
+
+        async function denyUser(userId) {
+            if (!confirm('Are you sure you want to deny this user?')) return;
+            
+            try {
+                const users = await fetchUsers();
+                const filteredUsers = users.filter(u => u.id !== userId);
+                await saveUsers(filteredUsers);
+                await loadAdminPanel();
+                alert('User request denied');
+            } catch (error) {
+                alert('Error denying user: ' + error.message);
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            
+            try {
+                const users = await fetchUsers();
+                const filteredUsers = users.filter(u => u.id !== userId);
+                await saveUsers(filteredUsers);
+                await loadAdminPanel();
+                alert('User deleted');
+            } catch (error) {
+                alert('Error deleting user: ' + error.message);
+            }
+        }
+
+        async function makeAdmin(userId) {
+            if (!confirm('Are you sure you want to make this user an administrator?')) return;
+            
+            try {
+                const users = await fetchUsers();
+                const user = users.find(u => u.id === userId);
+                
+                if (user) {
+                    user.role = 'admin';
+                    await saveUsers(users);
+                    await loadAdminPanel();
+                    alert(`${user.name} is now an administrator!`);
+                }
+            } catch (error) {
+                alert('Error updating user role: ' + error.message);
+            }
+        }
+
+        // CRM Data Functions
+        async function loadCRMData() {
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.DATA_FILE}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = atob(data.content);
+                    const crmData = JSON.parse(content);
+                    
+                    // Update dashboard
+                    document.getElementById('totalContacts').textContent = crmData.contacts?.length || 0;
+                    document.getElementById('totalCommunications').textContent = crmData.communications?.length || 0;
+                    document.getElementById('totalDocuments').textContent = crmData.documents?.length || 0;
+                    document.getElementById('totalIncidents').textContent = crmData.incidents?.length || 0;
+                    
+                    document.getElementById('syncStatus').innerHTML = '<span style="color: var(--success);">✓ Connected to GitHub</span>';
+                } else {
+                    document.getElementById('syncStatus').innerHTML = '<span style="color: var(--warning);">⚠ No data file found. Data will be created on first save.</span>';
+                }
+            } catch (error) {
+                console.error('Error loading CRM data:', error);
+                document.getElementById('syncStatus').innerHTML = '<span style="color: var(--danger);">✗ Error loading data</span>';
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
