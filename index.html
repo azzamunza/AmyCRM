@@ -765,7 +765,6 @@
 
     <!-- Google Sign-In (hidden) -->
     <div id="g_id_onload" data-client_id="" data-callback="handleGoogleSignIn"></div>
-    <script src="config.js"></script>
     <script>
         // Configuration (will be loaded from config.js)
         let CONFIG = {
@@ -775,7 +774,7 @@
             USERS_FILE: 'users.json',
             DATA_FILE: 'crm-data.json'
         };
-
+        <script src="config.js"></script>
         // Current user session
         let currentUser = null;
 
