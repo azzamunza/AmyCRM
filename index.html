@@ -784,11 +784,20 @@
     </div>
 
     <!-- Google Sign-In (hidden) -->
-    <div id="g_id_onload" data-client_id="" data-callback="handleGoogleSignIn" style="display: none;"></div>
-    
+   
     <script src="config.js"></script>
     <script>
-       
+        
+        const CONFIG = window.CRM_CONFIG;
+
+          // Dynamically insert Google Sign-In element
+          const gOnloadDiv = document.createElement('div');
+          gOnloadDiv.id = 'g_id_onload';
+          gOnloadDiv.dataset.client_id = CONFIG.GOOGLE_CLIENT_ID;
+          gOnloadDiv.dataset.callback = 'handleGoogleSignIn';
+          gOnloadDiv.style.display = 'none';
+          document.body.appendChild(gOnloadDiv);
+        
         // Current user session
         let currentUser = null;
         let googleScriptLoaded = false;
