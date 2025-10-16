@@ -38,16 +38,19 @@ jobs:
         run: |
           mkdir -p dist
           mkdir -p dist/images
+          mkdir -p dist/scripts
           cp index.html dist/
-          cp config.js dist/
+          cp config.js dist/scripts/ 
+          
           # Copy images folder if it exists
           if [ -d "images" ]; then
             cp -r images/* dist/images/
           fi
           echo "=== DIST FILES ==="
-          - name: Clean old gh-pages branch
-          run: |
-            rm -rf dist/.git
+          
+      - name: Clean old gh-pages branch
+        run: |
+          rm -rf dist/.git
 
           
       - name: Deploy to GitHub Pages
