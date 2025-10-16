@@ -45,7 +45,10 @@ jobs:
             cp -r images/* dist/images/
           fi
           echo "=== DIST FILES ==="
-          ls -R dist
+          - name: Clean old gh-pages branch
+          run: |
+            rm -rf dist/.git
+
           
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
