@@ -44,7 +44,9 @@ jobs:
           if [ -d "images" ]; then
             cp -r images/* dist/images/
           fi
-
+          echo "=== DIST FILES ==="
+          ls -R dist
+          
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
