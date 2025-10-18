@@ -1,26 +1,21 @@
 name: Deploy SafeCare CRM to GitHub Pages
-
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
   group: "pages"
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Create config.js
         run: |
           cat > config.js << 'EOF'
@@ -38,15 +33,16 @@ jobs:
           echo "✓ Config created successfully"
           echo "Contents:"
           cat config.js
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
       - name: Build site
         run: |
           mkdir -p _site
           cp index.html _site/
+          cp dashboard.html _site/
           cp config.js _site/
+          cp auth.js _site/
+          cp crm.js _site/
           
           if [ -d "images" ]; then
             mkdir -p _site/images
@@ -55,10 +51,8 @@ jobs:
           
           echo "Built site contents:"
           ls -la _site/
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-
   deploy:
     environment:
       name: github-pages
