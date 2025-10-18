@@ -1,27 +1,30 @@
-
-name: Build and Deploy SafeCare CRM
+name: Deploy SafeCare CRM to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create config.js with secrets
+      - name: Create config.js
         run: |
           cat > config.js << 'EOF'
-          // Auto-generated config file - DO NOT EDIT MANUALLY
+          // Auto-generated config file
           window.CRM_CONFIG = {
             GOOGLE_CLIENT_ID: '${{ secrets.GOOGLE_CLIENT_ID }}',
             GITHUB_USERNAME: '${{ secrets.CRM_GITHUB_USERNAME }}',
@@ -31,30 +34,38 @@ jobs:
             DATA_FILE: 'crm-data.json'
           };
           EOF
-          echo "Config file created successfully"
+          
+          echo "✓ Config created successfully"
+          echo "Contents:"
           cat config.js
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Build site
         run: |
-          mkdir -p dist
-          mkdir -p dist/images
-          mkdir -p dist/scripts
-          cp index.html dist/
-          cp config.js dist/scripts/ 
+          mkdir -p _site
+          cp index.html _site/
+          cp config.js _site/
           
-          # Copy images folder if it exists
           if [ -d "images" ]; then
-            cp -r images/* dist/images/
+            mkdir -p _site/images
+            cp -r images/* _site/images/
           fi
-          echo "=== DIST FILES ==="
           
-      - name: Clean old gh-pages branch
-        run: |
-          rm -rf dist/.git
+          echo "Built site contents:"
+          ls -la _site/
 
-          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+        id: deployment
+        uses: actions/deploy-pages@v4
