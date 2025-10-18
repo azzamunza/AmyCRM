@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "name": "Administrator",
+    "email": "azzamunza@gmail.com",
+    "phone": "",
+    "password": "",
+    "role": "admin",
+    "status": "approved",
+    "createdAt": "2025-10-18T07:47:04.947Z"
+  },
+  {
+    "id": 2,
+    "name": "Administrator",
+    "email": "amp41286@gmail.com",
+    "phone": "",
+    "password": "",
+    "role": "admin",
+    "status": "approved",
+    "createdAt": "2025-10-18T07:47:04.947Z"
+  }
+]
