@@ -878,7 +878,7 @@ function loadGoogleSignIn() {
     script.onload = () => {
         googleScriptLoaded = true;
         console.log('Google Sign-In script loaded successfully');
-        // Don't initialize here - we'll do it when button is clicked
+        // Don't initialize here - we'll initialize when button is clicked
     };
     script.onerror = () => {
         console.error('Failed to load Google Sign-In script');
