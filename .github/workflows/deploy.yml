@@ -43,6 +43,9 @@ jobs:
           cp config.js _site/
           cp auth.js _site/
           cp crm.js _site/
+          cp shared.css _site/
+          cp login.css _site/
+          cp dashboard.css _site/
           
           if [ -d "images" ]; then
             mkdir -p _site/images
