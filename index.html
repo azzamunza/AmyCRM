@@ -878,6 +878,13 @@
             script.onload = () => {
                 googleScriptLoaded = true;
                 console.log('Google Sign-In script loaded successfully');
+                // Initialize Google Identity Services
+                if (window.google) {
+                    google.accounts.id.initialize({
+                        client_id: CONFIG.GOOGLE_CLIENT_ID,
+                        callback: handleGoogleSignIn
+                    });
+                }
             };
             script.onerror = () => {
                 console.error('Failed to load Google Sign-In script');
@@ -885,7 +892,7 @@
             };
             document.head.appendChild(script);
         }
-
+        
         // Tab switching
         function switchTab(tabName) {
             document.querySelectorAll('.form-tab').forEach(tab => tab.classList.remove('active'));
