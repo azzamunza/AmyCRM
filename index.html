@@ -1043,100 +1043,177 @@ function loadGoogleSignIn() {
         }
 
         // Google Sign In
-async function signInWithGoogle() {
-    console.log('Google Sign In button clicked');
-    
-    if (!CONFIG.GOOGLE_CLIENT_ID || CONFIG.GOOGLE_CLIENT_ID === '') {
-        console.error('Google Client ID not configured');
-        showMessage('Google Sign-In is not configured. Please use email/password or contact administrator.', 'warning');
-        return;
-    }
-
-    if (!googleScriptLoaded || !window.google) {
-        console.error('Google script not loaded');
-        showMessage('Google Sign-In is loading... Please try again in a moment.', 'warning');
-        return;
-    }
-
-    try {
-        console.log('Initializing Google Sign-In popup...');
-        
-        // Initialize on-demand
-        google.accounts.id.initialize({
-            client_id: CONFIG.GOOGLE_CLIENT_ID,
-            callback: handleGoogleSignIn,
-            auto_select: false,
-            cancel_on_tap_outside: false
-        });
-        
-        // Create a temporary container for the button
-        const buttonContainer = document.createElement('div');
-        buttonContainer.id = 'google-signin-container';
-        buttonContainer.style.position = 'fixed';
-        buttonContainer.style.top = '50%';
-        buttonContainer.style.left = '50%';
-        buttonContainer.style.transform = 'translate(-50%, -50%)';
-        buttonContainer.style.zIndex = '10000';
-        buttonContainer.style.background = 'white';
-        buttonContainer.style.padding = '30px';
-        buttonContainer.style.borderRadius = '16px';
-        buttonContainer.style.boxShadow = '0 10px 40px rgba(0,0,0,0.3)';
-        
-        // Add close button
-        const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '✕';
-        closeBtn.style.position = 'absolute';
-        closeBtn.style.top = '10px';
-        closeBtn.style.right = '10px';
-        closeBtn.style.border = 'none';
-        closeBtn.style.background = 'none';
-        closeBtn.style.fontSize = '20px';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.color = '#666';
-        closeBtn.onclick = () => {
-            document.body.removeChild(buttonContainer);
-            document.body.removeChild(overlay);
-        };
-        
-        // Add overlay
-        const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'rgba(0,0,0,0.5)';
-        overlay.style.zIndex = '9999';
-        overlay.onclick = () => {
-            document.body.removeChild(buttonContainer);
-            document.body.removeChild(overlay);
-        };
-        
-        document.body.appendChild(overlay);
-        buttonContainer.appendChild(closeBtn);
-        document.body.appendChild(buttonContainer);
-        
-        // Render Google button
-        google.accounts.id.renderButton(
-            buttonContainer,
-            {
-                theme: 'outline',
-                size: 'large',
-                type: 'standard',
-                text: 'signin_with',
-                shape: 'rectangular',
-                logo_alignment: 'left',
-                width: 280
+        async function signInWithGoogle() {
+            console.log('Google Sign In button clicked');
+            
+            if (!CONFIG.GOOGLE_CLIENT_ID || CONFIG.GOOGLE_CLIENT_ID === '') {
+                console.error('Google Client ID not configured');
+                showMessage('Google Sign-In is not configured. Please use email/password or contact administrator.', 'warning');
+                return;
             }
-        );
         
-        console.log('Google Sign-In button rendered');
+            if (!googleScriptLoaded || !window.google) {
+                console.error('Google script not loaded');
+                showMessage('Google Sign-In is loading... Please try again in a moment.', 'warning');
+                return;
+            }
         
-    } catch (error) {
-        console.error('Google Sign-In error:', error);
-        showMessage('Error with Google Sign-In: ' + error.message, 'warning');
+            try {
+                console.log('Initializing Google Sign-In popup...');
+                
+                // Initialize on-demand
+                google.accounts.id.initialize({
+                    client_id: CONFIG.GOOGLE_CLIENT_ID,
+                    callback: handleGoogleSignIn,
+                    auto_select: false,
+                    cancel_on_tap_outside: false
+                });
+                
+                // Create a temporary container for the button
+                const buttonContainer = document.createElement('div');
+                buttonContainer.id = 'google-signin-container';
+                buttonContainer.style.position = 'fixed';
+                buttonContainer.style.top = '50%';
+                buttonContainer.style.left = '50%';
+                buttonContainer.style.transform = 'translate(-50%, -50%)';
+                buttonContainer.style.zIndex = '10000';
+                buttonContainer.style.background = 'white';
+                buttonContainer.style.padding = '30px';
+                buttonContainer.style.borderRadius = '16px';
+                buttonContainer.style.boxShadow = '0 10px 40px rgba(0,0,0,0.3)';
+                
+                // Add close button
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '✕';
+                closeBtn.style.position = 'absolute';
+                closeBtn.style.top = '10px';
+                closeBtn.style.right = '10px';
+                closeBtn.style.border = 'none';
+                closeBtn.style.background = 'none';
+                closeBtn.style.fontSize = '20px';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.style.color = '#666';
+                closeBtn.onclick = () => {
+                    document.body.removeChild(buttonContainer);
+                    document.body.removeChild(overlay);
+                };
+                
+                // Add overlay
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.background = 'rgba(0,0,0,0.5)';
+                overlay.style.zIndex = '9999';
+                overlay.onclick = () => {
+                    document.body.removeChild(buttonContainer);
+                    document.body.removeChild(overlay);
+                };
+                
+                document.body.appendChild(overlay);
+                buttonContainer.appendChild(closeBtn);
+                document.body.appendChild(buttonContainer);
+                
+                // Render Google button
+                google.accounts.id.renderButton(
+                    buttonContainer,
+                    {
+                        theme: 'outline',
+                        size: 'large',
+                        type: 'standard',
+                        text: 'signin_with',
+                        shape: 'rectangular',
+                        logo_alignment: 'left',
+                        width: 280
+                    }
+                );
+                
+                console.log('Google Sign-In button rendered');
+        
+            } catch (error) {
+                console.error('Google Sign-In error:', error);
+                showMessage('Error with Google Sign-In: ' + error.message, 'warning');
+            }
+        }
+
+        async function handleGoogleSignIn(response) {
+        console.log('Google Sign-In callback triggered');
+        
+        try {
+            // Decode JWT token
+            const data = parseJwt(response.credential);
+            const email = data.email;
+            console.log('Google Sign-In email:', email);
+    
+            showMessage('Verifying account...', 'info');
+    
+            // Get users
+            const users = await fetchUsers();
+            
+            // Check if user exists and is approved
+            let user = users.find(u => u.email === email);
+            
+            if (!user) {
+                // Auto-approve administrators
+                const adminEmails = ['azzamunza@gmail.com', 'amp41286@gmail.com'];
+                
+                if (adminEmails.includes(email)) {
+                    console.log('Auto-creating admin user:', email);
+                    // Create admin user automatically
+                    user = {
+                        id: Date.now(),
+                        name: data.name || 'Administrator',
+                        email: email,
+                        phone: '',
+                        password: '',
+                        role: 'admin',
+                        status: 'approved',
+                        createdAt: new Date().toISOString()
+                    };
+                    users.push(user);
+                    await saveUsers(users);
+                } else {
+                    showMessage('No account found. Please request access first.', 'warning');
+                    return;
+                }
+            }
+    
+            if (user.status !== 'approved') {
+                showMessage('Your account is pending approval', 'warning');
+                return;
+            }
+    
+            // Set current user
+            currentUser = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            };
+    
+            localStorage.setItem('userSession', JSON.stringify(currentUser));
+            showMessage('Sign in successful!', 'success');
+            
+            // Close the popup and overlay if they exist
+            const popup = document.getElementById('google-signin-container');
+            const overlay = document.querySelector('div[style*="position: fixed"][style*="z-index: 9999"]');
+            if (popup) document.body.removeChild(popup);
+            if (overlay) document.body.removeChild(overlay);
+            
+            setTimeout(async () => {
+                await loadMainApp();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Google Sign-In error:', error);
+            showMessage('Error with Google Sign-In: ' + error.message, 'danger');
+        }
     }
-}
+
+
+        
 
         // Parse JWT token
         function parseJwt(token) {
