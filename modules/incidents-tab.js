@@ -2,7 +2,7 @@
 // Copy this file and rename it to: [tabname]-tab.js
 // Replace all instances of "ModuleName" with your actual module name (e.g., "Contacts", "Documents")
 
-const ModuleNameTab = {
+const incidentsTab = {
     // Module state
     data: [],
     filters: {
@@ -34,17 +34,17 @@ const ModuleNameTab = {
                             type="text" 
                             id="moduleSearchInput" 
                             placeholder="Search..." 
-                            oninput="ModuleNameTab.handleSearch(this.value)"
+                            oninput="incidentsTab.handleSearch(this.value)"
                         >
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <select onchange="ModuleNameTab.handleFilter('status', this.value)">
+                    <select onchange="incidentsTab.handleFilter('status', this.value)">
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button class="btn btn-secondary btn-sm" onclick="ModuleNameTab.exportData()">
+                    <button class="btn btn-secondary btn-sm" onclick="incidentsTab.exportData()">
                         📥 Export
                     </button>
                 </div>
@@ -62,9 +62,9 @@ const ModuleNameTab = {
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3 id="modalTitle">Add New Item</h3>
-                        <button class="modal-close" onclick="ModuleNameTab.closeModal()">✕</button>
+                        <button class="modal-close" onclick="incidentsTab.closeModal()">✕</button>
                     </div>
-                    <form id="moduleForm" onsubmit="ModuleNameTab.handleSubmit(event)">
+                    <form id="moduleForm" onsubmit="incidentsTab.handleSubmit(event)">
                         <!-- Add your form fields here -->
                         <div class="form-group">
                             <label>Name *</label>
@@ -86,7 +86,7 @@ const ModuleNameTab = {
 
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
-                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="ModuleNameTab.closeModal()">Cancel</button>
+                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="incidentsTab.closeModal()">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -126,7 +126,7 @@ const ModuleNameTab = {
                     <div class="empty-state-icon">📋</div>
                     <h3>No items found</h3>
                     <p>Get started by adding your first item</p>
-                    <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">Add New Item</button>
+                    <button class="btn btn-primary" onclick="incidentsTab.showAddModal()">Add New Item</button>
                 </div>
             `;
             return;
@@ -149,10 +149,10 @@ const ModuleNameTab = {
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn-sm btn-primary" onclick="ModuleNameTab.showEditModal(${item.id})">
+                        <button class="btn-sm btn-primary" onclick="incidentsTab.showEditModal(${item.id})">
                             ✏️ Edit
                         </button>
-                        <button class="btn-sm btn-danger" onclick="ModuleNameTab.confirmDelete(${item.id})">
+                        <button class="btn-sm btn-danger" onclick="incidentsTab.confirmDelete(${item.id})">
                             🗑️ Delete
                         </button>
                     </div>
