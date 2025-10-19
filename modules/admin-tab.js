@@ -6,6 +6,17 @@ const AdminTab = {
     async render() {
         const container = document.getElementById('admin');
         
+        // Check if user is admin FIRST, before rendering anything
+        if (!window.currentUser || window.currentUser.role !== 'admin') {
+            container.innerHTML = `
+                <div class="card">
+                    <h3 style="color: var(--danger);">Access Denied</h3>
+                    <p>You do not have permission to access the admin panel.</p>
+                </div>
+            `;
+            return;
+        }
+        
         container.innerHTML = `
             <h2 style="margin-bottom: 30px;">Admin Panel</h2>
             
@@ -112,21 +123,9 @@ const AdminTab = {
 
     async init() {
         console.log('Initializing Admin Panel...');
+        console.log('Current user:', window.currentUser);
         
-        // Wait a tick to ensure currentUser is available
-        await new Promise(resolve => setTimeout(resolve, 0));
-        
-        // Check if user is admin
-        if (!window.currentUser || !requireAdmin(window.currentUser)) {
-            document.getElementById('admin').innerHTML = `
-                <div class="card">
-                    <h3 style="color: var(--danger);">Access Denied</h3>
-                    <p>You do not have permission to access the admin panel.</p>
-                </div>
-            `;
-            return;
-        }
-
+        // User check already done in render(), so just load data
         await this.loadUsers();
         this.updateStatistics();
         this.displayUsers('all');
