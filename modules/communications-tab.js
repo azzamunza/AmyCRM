@@ -319,7 +319,7 @@ const communicationsTab = {
         alert(message);
     }
 };
-window.ContactsTab = CommunicationsTab;
+window.CommunicationsTab = CommunicationsTab;
 
 // Auto-initialize when tab is shown
 // This will be called from dashboard.html when the tab is clicked
