@@ -108,6 +108,7 @@ const AdminTab = {
         `;
 
         await this.init();
+        AdminTab.refresh()
     },
 
     async init() {
