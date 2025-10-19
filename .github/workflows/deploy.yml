@@ -48,10 +48,7 @@ jobs:
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
-          
-          if [ -d "modules" ]; then
-            cp modules/*.js _site/modules/
-          fi
+          cp modules/*.js _site/modules/        
           
           if [ -d "images" ]; then
             mkdir -p _site/images
