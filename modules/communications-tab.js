@@ -2,7 +2,7 @@
 // Copy this file and rename it to: [tabname]-tab.js
 // Replace all instances of "ModuleName" with your actual module name (e.g., "Contacts", "Documents")
 
-const communicationsTab = {
+const CommunicationsTab = {
     // Module state
     data: [],
     filters: {
@@ -15,12 +15,12 @@ const communicationsTab = {
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('communications'); // Change to your tab ID
+        const container = document.getElementById('Communications'); // Change to your tab ID
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2>Module Name</h2>
-                <button class="btn btn-primary" onclick="communicationsTab.showAddModal()">
+                <button class="btn btn-primary" onclick="CommunicationsTab.showAddModal()">
                     ➕ Add New
                 </button>
             </div>
@@ -34,17 +34,17 @@ const communicationsTab = {
                             type="text" 
                             id="moduleSearchInput" 
                             placeholder="Search..." 
-                            oninput="communicationsTab.handleSearch(this.value)"
+                            oninput="CommunicationsTab.handleSearch(this.value)"
                         >
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <select onchange="communicationsTab.handleFilter('status', this.value)">
+                    <select onchange="CommunicationsTab.handleFilter('status', this.value)">
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button class="btn btn-secondary btn-sm" onclick="communicationsTab.exportData()">
+                    <button class="btn btn-secondary btn-sm" onclick="CommunicationsTab.exportData()">
                         📥 Export
                     </button>
                 </div>
@@ -62,9 +62,9 @@ const communicationsTab = {
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3 id="modalTitle">Add New Item</h3>
-                        <button class="modal-close" onclick="communicationsTab.closeModal()">✕</button>
+                        <button class="modal-close" onclick="CommunicationsTab.closeModal()">✕</button>
                     </div>
-                    <form id="moduleForm" onsubmit="communicationsTab.handleSubmit(event)">
+                    <form id="moduleForm" onsubmit="CommunicationsTab.handleSubmit(event)">
                         <!-- Add your form fields here -->
                         <div class="form-group">
                             <label>Name *</label>
@@ -86,7 +86,7 @@ const communicationsTab = {
 
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
-                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="communicationsTab.closeModal()">Cancel</button>
+                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="CommunicationsTab.closeModal()">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -98,7 +98,7 @@ const communicationsTab = {
 
     // Initialize the tab
     async init() {
-        console.log('Initializing communications tab...');
+        console.log('Initializing Communications tab...');
         await this.loadData();
         this.displayData();
     },
@@ -107,7 +107,7 @@ const communicationsTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.communications || []; // Change to your data property
+            this.data = crmData.Communications || []; // Change to your data property
             console.log(`Loaded ${this.data.length} items`);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -126,7 +126,7 @@ const communicationsTab = {
                     <div class="empty-state-icon">📋</div>
                     <h3>No items found</h3>
                     <p>Get started by adding your first item</p>
-                    <button class="btn btn-primary" onclick="communicationsTab.showAddModal()">Add New Item</button>
+                    <button class="btn btn-primary" onclick="CommunicationsTab.showAddModal()">Add New Item</button>
                 </div>
             `;
             return;
@@ -149,10 +149,10 @@ const communicationsTab = {
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn-sm btn-primary" onclick="communicationsTab.showEditModal(${item.id})">
+                        <button class="btn-sm btn-primary" onclick="CommunicationsTab.showEditModal(${item.id})">
                             ✏️ Edit
                         </button>
-                        <button class="btn-sm btn-danger" onclick="communicationsTab.confirmDelete(${item.id})">
+                        <button class="btn-sm btn-danger" onclick="CommunicationsTab.confirmDelete(${item.id})">
                             🗑️ Delete
                         </button>
                     </div>
@@ -305,7 +305,7 @@ const communicationsTab = {
             return;
         }
 
-        exportToCSV(filteredData, 'communications-export');
+        exportToCSV(filteredData, 'Communications-export');
     },
 
     // Show success message
