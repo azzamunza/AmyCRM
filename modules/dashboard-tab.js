@@ -164,3 +164,6 @@ const DashboardTab = {
         showTab(tabName);
     }
 };
+
+// Make available globally
+window.DashboardTab = DashboardTab;
