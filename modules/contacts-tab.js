@@ -1,27 +1,26 @@
-// tab-module-template.js - Template for creating new tab modules
-// Copy this file and rename it to: [tabname]-tab.js
-// Replace all instances of "ModuleName" with your actual module name (e.g., "Contacts", "Documents")
+// contacts-tab.js - Contacts management module
 
-const ModuleNameTab = {
+const ContactsTab = {
     // Module state
     data: [],
     filters: {
         search: '',
-        status: 'all',
-        dateFrom: null,
-        dateTo: null
+        type: 'all'
     },
-    currentItem: null,
+    currentContact: null,
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('contacts'); // Change to your tab ID
+        const container = document.getElementById('contacts');
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                <h2>Module Name</h2>
-                <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">
-                    ➕ Add New
+                <div>
+                    <h2>Contacts</h2>
+                    <p style="color: var(--text-light); margin-top: 5px;">Manage your provider and care team contacts</p>
+                </div>
+                <button class="btn btn-primary" onclick="ContactsTab.showAddModal()">
+                    ➕ Add Contact
                 </button>
             </div>
 
@@ -32,63 +31,113 @@ const ModuleNameTab = {
                         <span class="search-icon">🔍</span>
                         <input 
                             type="text" 
-                            id="moduleSearchInput" 
-                            placeholder="Search..." 
-                            oninput="ModuleNameTab.handleSearch(this.value)"
+                            id="contactSearchInput" 
+                            placeholder="Search contacts..." 
+                            oninput="ContactsTab.handleSearch(this.value)"
                         >
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <select onchange="ModuleNameTab.handleFilter('status', this.value)">
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
+                    <select onchange="ContactsTab.handleFilter('type', this.value)">
+                        <option value="all">All Types</option>
+                        <option value="provider">Healthcare Provider</option>
+                        <option value="support">Support Worker</option>
+                        <option value="therapist">Therapist</option>
+                        <option value="coordinator">Care Coordinator</option>
+                        <option value="emergency">Emergency Contact</option>
+                        <option value="other">Other</option>
                     </select>
-                    <button class="btn btn-secondary btn-sm" onclick="ModuleNameTab.exportData()">
-                        📥 Export
+                    <button class="btn btn-secondary btn-sm" onclick="ContactsTab.exportData()">
+                        📥 Export CSV
                     </button>
                 </div>
             </div>
 
             <!-- Content area -->
-            <div id="moduleContent">
+            <div id="contactsContent">
                 <div class="card">
-                    <p style="text-align: center; color: var(--text-light);">Loading...</p>
+                    <p style="text-align: center; color: var(--text-light);">Loading contacts...</p>
                 </div>
             </div>
 
             <!-- Add/Edit Modal -->
-            <div id="moduleModal" class="modal">
+            <div id="contactModal" class="modal">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3 id="modalTitle">Add New Item</h3>
-                        <button class="modal-close" onclick="ModuleNameTab.closeModal()">✕</button>
+                        <h3 id="contactModalTitle">Add New Contact</h3>
+                        <button class="modal-close" onclick="ContactsTab.closeModal()">✕</button>
                     </div>
-                    <form id="moduleForm" onsubmit="ModuleNameTab.handleSubmit(event)">
-                        <!-- Add your form fields here -->
-                        // Add contact-specific fields
-                           <div class="form-group">
-                               <label>Full Name *</label>
-                               <input type="text" id="contactName" required>
-                           </div>
-                           <div class="form-group">
-                               <label>Email</label>
-                               <input type="email" id="contactEmail">
-                           </div>
-                           <div class="form-group">
-                               <label>Phone</label>
-                               <input type="tel" id="contactPhone">
-                           </div>
-                           <div class="form-group">
-                               <label>Organization</label>
-                               <input type="text" id="contactOrganization">
-                           </div>
+                    <form id="contactForm" onsubmit="ContactsTab.handleSubmit(event)">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" id="contactName" required placeholder="Dr. Jane Smith">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Contact Type *</label>
+                            <select id="contactType" required>
+                                <option value="">Select type...</option>
+                                <option value="provider">Healthcare Provider</option>
+                                <option value="support">Support Worker</option>
+                                <option value="therapist">Therapist</option>
+                                <option value="coordinator">Care Coordinator</option>
+                                <option value="emergency">Emergency Contact</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" id="contactEmail" placeholder="email@example.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" id="contactPhone" placeholder="(555) 123-4567">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Organization / Practice</label>
+                            <input type="text" id="contactOrganization" placeholder="ABC Medical Center">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Role / Specialty</label>
+                            <input type="text" id="contactRole" placeholder="General Practitioner">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Address</label>
+                            <textarea id="contactAddress" rows="2" placeholder="123 Main St, City, State ZIP"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea id="contactNotes" rows="3" placeholder="Additional information, office hours, etc."></textarea>
+                        </div>
 
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
-                            <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
-                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="ModuleNameTab.closeModal()">Cancel</button>
+                            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                                💾 Save Contact
+                            </button>
+                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="ContactsTab.closeModal()">
+                                Cancel
+                            </button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- View Contact Modal -->
+            <div id="viewContactModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Contact Details</h3>
+                        <button class="modal-close" onclick="ContactsTab.closeViewModal()">✕</button>
+                    </div>
+                    <div id="viewContactContent"></div>
                 </div>
             </div>
         `;
@@ -98,7 +147,7 @@ const ModuleNameTab = {
 
     // Initialize the tab
     async init() {
-        console.log('Initializing contacts tab...');
+        console.log('Initializing Contacts tab...');
         await this.loadData();
         this.displayData();
     },
@@ -107,65 +156,174 @@ const ModuleNameTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.contacts || []; // Change to your data property
-            console.log(`Loaded ${this.data.length} items`);
+            this.data = crmData.contacts || [];
+            console.log(`Loaded ${this.data.length} contacts`);
         } catch (error) {
-            console.error('Error loading data:', error);
-            this.showError('Failed to load data');
+            console.error('Error loading contacts:', error);
+            this.showError('Failed to load contacts: ' + error.message);
         }
     },
 
-    async addItem(data) {
-       await addContact(data); // From crm.js
-   }
-
-   async updateItem(id, data) {
-       await updateContact(id, data); // From crm.js
-   }
     // Display data in the UI
     displayData() {
-        const contentEl = document.getElementById('moduleContent');
+        const contentEl = document.getElementById('contactsContent');
         const filteredData = this.getFilteredData();
 
         if (filteredData.length === 0) {
             contentEl.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-state-icon">📋</div>
-                    <h3>No items found</h3>
-                    <p>Get started by adding your first item</p>
-                    <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">Add New Item</button>
+                    <div class="empty-state-icon">👥</div>
+                    <h3>No contacts found</h3>
+                    <p>Add your first contact to get started</p>
+                    <button class="btn btn-primary" onclick="ContactsTab.showAddModal()">
+                        ➕ Add Contact
+                    </button>
                 </div>
             `;
             return;
         }
 
-        // Render items as cards or table
-        contentEl.innerHTML = filteredData.map(item => `
-            <div class="card" style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div style="flex: 1;">
-                        <h4 style="margin-bottom: 10px;">${item.name}</h4>
-                        <p style="color: var(--text-light); margin-bottom: 10px;">${item.description || 'No description'}</p>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <span class="badge badge-${item.status === 'active' ? 'success' : 'secondary'}">
-                                ${item.status || 'active'}
-                            </span>
-                            <span style="font-size: 0.85em; color: var(--text-light);">
-                                Created: ${formatDateShort(item.createdAt)}
-                            </span>
+        // Group contacts by type
+        const grouped = this.groupByType(filteredData);
+
+        contentEl.innerHTML = Object.entries(grouped).map(([type, contacts]) => `
+            <div style="margin-bottom: 30px;">
+                <h3 style="margin-bottom: 15px; color: var(--text-light); text-transform: capitalize;">
+                    ${this.getTypeIcon(type)} ${this.getTypeLabel(type)} (${contacts.length})
+                </h3>
+                <div style="display: grid; gap: 15px;">
+                    ${contacts.map(contact => this.renderContactCard(contact)).join('')}
+                </div>
+            </div>
+        `).join('');
+    },
+
+    // Render individual contact card
+    renderContactCard(contact) {
+        return `
+            <div class="card" style="transition: all 0.3s; cursor: pointer;" onmouseenter="this.style.transform='translateX(5px)'" onmouseleave="this.style.transform='translateX(0)'">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 20px;">
+                    <div style="flex: 1;" onclick="ContactsTab.viewContact(${contact.id})">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <h4 style="margin: 0;">${contact.name}</h4>
+                            <span class="badge badge-user">${this.getTypeLabel(contact.type)}</span>
                         </div>
+                        
+                        ${contact.organization ? `
+                            <p style="color: var(--text-light); margin-bottom: 8px;">
+                                🏢 ${contact.organization}${contact.role ? ` • ${contact.role}` : ''}
+                            </p>
+                        ` : ''}
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 0.9em; color: var(--text-light);">
+                            ${contact.email ? `
+                                <span>📧 ${contact.email}</span>
+                            ` : ''}
+                            ${contact.phone ? `
+                                <span>📞 ${contact.phone}</span>
+                            ` : ''}
+                        </div>
+                        
+                        ${contact.notes ? `
+                            <p style="margin-top: 10px; font-size: 0.9em; color: var(--text-light); font-style: italic;">
+                                ${contact.notes.substring(0, 100)}${contact.notes.length > 100 ? '...' : ''}
+                            </p>
+                        ` : ''}
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-sm btn-primary" onclick="ModuleNameTab.showEditModal(${item.id})">
-                            ✏️ Edit
+                    
+                    <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                        ${contact.email ? `
+                            <button class="btn-sm btn-secondary" onclick="event.stopPropagation(); window.location.href='mailto:${contact.email}'" title="Send Email">
+                                📧
+                            </button>
+                        ` : ''}
+                        ${contact.phone ? `
+                            <button class="btn-sm btn-secondary" onclick="event.stopPropagation(); window.location.href='tel:${contact.phone}'" title="Call">
+                                📞
+                            </button>
+                        ` : ''}
+                        <button class="btn-sm btn-primary" onclick="event.stopPropagation(); ContactsTab.showEditModal(${contact.id})" title="Edit">
+                            ✏️
                         </button>
-                        <button class="btn-sm btn-danger" onclick="ModuleNameTab.confirmDelete(${item.id})">
-                            🗑️ Delete
+                        <button class="btn-sm btn-danger" onclick="event.stopPropagation(); ContactsTab.confirmDelete(${contact.id})" title="Delete">
+                            🗑️
                         </button>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+    },
+
+    // View contact details
+    viewContact(contactId) {
+        const contact = this.data.find(c => c.id === contactId);
+        if (!contact) return;
+
+        const content = document.getElementById('viewContactContent');
+        content.innerHTML = `
+            <div style="padding: 20px 0;">
+                <div style="margin-bottom: 20px;">
+                    <h2 style="margin-bottom: 5px;">${contact.name}</h2>
+                    <span class="badge badge-user">${this.getTypeLabel(contact.type)}</span>
+                </div>
+
+                ${contact.organization || contact.role ? `
+                    <div style="margin-bottom: 20px; padding: 15px; background: var(--light); border-radius: 8px;">
+                        ${contact.organization ? `<p><strong>Organization:</strong> ${contact.organization}</p>` : ''}
+                        ${contact.role ? `<p style="margin-top: 5px;"><strong>Role/Specialty:</strong> ${contact.role}</p>` : ''}
+                    </div>
+                ` : ''}
+
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">Contact Information</h4>
+                    ${contact.email ? `
+                        <p style="margin: 8px 0;">
+                            <strong>Email:</strong> 
+                            <a href="mailto:${contact.email}" style="color: var(--primary);">${contact.email}</a>
+                        </p>
+                    ` : ''}
+                    ${contact.phone ? `
+                        <p style="margin: 8px 0;">
+                            <strong>Phone:</strong> 
+                            <a href="tel:${contact.phone}" style="color: var(--primary);">${contact.phone}</a>
+                        </p>
+                    ` : ''}
+                    ${contact.address ? `
+                        <p style="margin: 8px 0;">
+                            <strong>Address:</strong><br>
+                            ${contact.address.replace(/\n/g, '<br>')}
+                        </p>
+                    ` : ''}
+                </div>
+
+                ${contact.notes ? `
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 10px;">Notes</h4>
+                        <p style="padding: 15px; background: var(--light); border-radius: 8px; white-space: pre-wrap;">${contact.notes}</p>
+                    </div>
+                ` : ''}
+
+                <div style="padding-top: 15px; border-top: 1px solid var(--border); font-size: 0.85em; color: var(--text-light);">
+                    <p>Created: ${formatDate(contact.createdAt)}${contact.createdBy ? ` by ${contact.createdBy}` : ''}</p>
+                    ${contact.updatedAt ? `<p style="margin-top: 5px;">Last updated: ${formatDate(contact.updatedAt)}${contact.updatedBy ? ` by ${contact.updatedBy}` : ''}</p>` : ''}
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-primary" style="flex: 1;" onclick="ContactsTab.closeViewModal(); ContactsTab.showEditModal(${contact.id})">
+                        ✏️ Edit Contact
+                    </button>
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="ContactsTab.closeViewModal()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('viewContactModal').classList.add('active');
+    },
+
+    closeViewModal() {
+        document.getElementById('viewContactModal').classList.remove('active');
     },
 
     // Get filtered data based on current filters
@@ -175,23 +333,57 @@ const ModuleNameTab = {
         // Search filter
         if (this.filters.search) {
             const search = this.filters.search.toLowerCase();
-            filtered = filtered.filter(item => 
-                item.name?.toLowerCase().includes(search) ||
-                item.description?.toLowerCase().includes(search)
-            );
+            filtered = searchContacts(filtered, search);
         }
 
-        // Status filter
-        if (this.filters.status !== 'all') {
-            filtered = filtered.filter(item => item.status === this.filters.status);
+        // Type filter
+        if (this.filters.type !== 'all') {
+            filtered = filtered.filter(contact => contact.type === this.filters.type);
         }
 
-        // Date filters
-        if (this.filters.dateFrom || this.filters.dateTo) {
-            filtered = filterByDate(filtered, this.filters.dateFrom, this.filters.dateTo);
-        }
+        // Sort by name
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
 
         return filtered;
+    },
+
+    // Group contacts by type
+    groupByType(contacts) {
+        const grouped = {};
+        contacts.forEach(contact => {
+            const type = contact.type || 'other';
+            if (!grouped[type]) {
+                grouped[type] = [];
+            }
+            grouped[type].push(contact);
+        });
+        return grouped;
+    },
+
+    // Get type label
+    getTypeLabel(type) {
+        const labels = {
+            provider: 'Healthcare Provider',
+            support: 'Support Worker',
+            therapist: 'Therapist',
+            coordinator: 'Care Coordinator',
+            emergency: 'Emergency Contact',
+            other: 'Other'
+        };
+        return labels[type] || 'Other';
+    },
+
+    // Get type icon
+    getTypeIcon(type) {
+        const icons = {
+            provider: '👨‍⚕️',
+            support: '🤝',
+            therapist: '🧠',
+            coordinator: '📋',
+            emergency: '🚨',
+            other: '👤'
+        };
+        return icons[type] || '👤';
     },
 
     // Handle search input
@@ -208,30 +400,35 @@ const ModuleNameTab = {
 
     // Show add modal
     showAddModal() {
-        this.currentItem = null;
-        document.getElementById('modalTitle').textContent = 'Add New Item';
-        document.getElementById('moduleForm').reset();
-        document.getElementById('moduleModal').classList.add('active');
+        this.currentContact = null;
+        document.getElementById('contactModalTitle').textContent = 'Add New Contact';
+        document.getElementById('contactForm').reset();
+        document.getElementById('contactModal').classList.add('active');
     },
 
     // Show edit modal
-    showEditModal(itemId) {
-        this.currentItem = this.data.find(item => item.id === itemId);
-        if (!this.currentItem) return;
+    showEditModal(contactId) {
+        this.currentContact = this.data.find(c => c.id === contactId);
+        if (!this.currentContact) return;
 
-        document.getElementById('modalTitle').textContent = 'Edit Item';
-        document.getElementById('itemName').value = this.currentItem.name || '';
-        document.getElementById('itemDescription').value = this.currentItem.description || '';
-        document.getElementById('itemStatus').value = this.currentItem.status || 'active';
+        document.getElementById('contactModalTitle').textContent = 'Edit Contact';
+        document.getElementById('contactName').value = this.currentContact.name || '';
+        document.getElementById('contactType').value = this.currentContact.type || '';
+        document.getElementById('contactEmail').value = this.currentContact.email || '';
+        document.getElementById('contactPhone').value = this.currentContact.phone || '';
+        document.getElementById('contactOrganization').value = this.currentContact.organization || '';
+        document.getElementById('contactRole').value = this.currentContact.role || '';
+        document.getElementById('contactAddress').value = this.currentContact.address || '';
+        document.getElementById('contactNotes').value = this.currentContact.notes || '';
         
-        document.getElementById('moduleModal').classList.add('active');
+        document.getElementById('contactModal').classList.add('active');
     },
 
     // Close modal
     closeModal() {
-        document.getElementById('moduleModal').classList.remove('active');
-        document.getElementById('moduleForm').reset();
-        this.currentItem = null;
+        document.getElementById('contactModal').classList.remove('active');
+        document.getElementById('contactForm').reset();
+        this.currentContact = null;
     },
 
     // Handle form submission
@@ -239,68 +436,67 @@ const ModuleNameTab = {
         event.preventDefault();
 
         const formData = {
-            name: document.getElementById('itemName').value,
-            description: document.getElementById('itemDescription').value,
-            status: document.getElementById('itemStatus').value
+            name: document.getElementById('contactName').value.trim(),
+            type: document.getElementById('contactType').value,
+            email: document.getElementById('contactEmail').value.trim(),
+            phone: document.getElementById('contactPhone').value.trim(),
+            organization: document.getElementById('contactOrganization').value.trim(),
+            role: document.getElementById('contactRole').value.trim(),
+            address: document.getElementById('contactAddress').value.trim(),
+            notes: document.getElementById('contactNotes').value.trim()
         };
 
         try {
-            if (this.currentItem) {
+            if (this.currentContact) {
                 // Update existing
-                await this.updateItem(this.currentItem.id, formData);
-                this.showSuccess('Item updated successfully');
+                await updateContact(this.currentContact.id, formData);
+                this.showSuccess('✓ Contact updated successfully');
             } else {
                 // Create new
-                await this.addItem(formData);
-                this.showSuccess('Item added successfully');
+                await addContact(formData);
+                this.showSuccess('✓ Contact added successfully');
             }
 
             this.closeModal();
             await this.loadData();
             this.displayData();
+
+            // Refresh dashboard if it exists
+            if (typeof DashboardTab !== 'undefined') {
+                await DashboardTab.refresh();
+            }
         } catch (error) {
-            console.error('Error saving item:', error);
-            this.showError('Failed to save item: ' + error.message);
+            console.error('Error saving contact:', error);
+            this.showError('Failed to save contact: ' + error.message);
         }
-    },
-
-    // Add new item
-    async addItem(data) {
-        // Replace with your actual add function from crm.js
-        // Example: await addContact(data);
-        console.log('Adding item:', data);
-    },
-
-    // Update existing item
-    async updateItem(id, data) {
-        // Replace with your actual update function from crm.js
-        // Example: await updateContact(id, data);
-        console.log('Updating item:', id, data);
     },
 
     // Confirm delete
-    confirmDelete(itemId) {
-        const item = this.data.find(i => i.id === itemId);
-        if (!item) return;
+    confirmDelete(contactId) {
+        const contact = this.data.find(c => c.id === contactId);
+        if (!contact) return;
 
-        if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
-            this.deleteItem(itemId);
+        if (confirm(`Are you sure you want to delete "${contact.name}"?\n\nThis action cannot be undone.`)) {
+            this.deleteContact(contactId);
         }
     },
 
-    // Delete item
-    async deleteItem(itemId) {
+    // Delete contact
+    async deleteContact(contactId) {
         try {
-            // Replace with your actual delete function from crm.js
-            // Example: await deleteContact(itemId);
-            console.log('Deleting item:', itemId);
+            await deleteContact(contactId);
             
             await this.loadData();
             this.displayData();
-            this.showSuccess('Item deleted successfully');
+            this.showSuccess('✓ Contact deleted successfully');
+
+            // Refresh dashboard if it exists
+            if (typeof DashboardTab !== 'undefined') {
+                await DashboardTab.refresh();
+            }
         } catch (error) {
-            console.error('Error deleting item:', error);
-            this.showError('Failed to delete item');
+            console.error('Error deleting contact:', error);
+            this.showError('Failed to delete contact: ' + error.message);
         }
     },
 
@@ -308,16 +504,15 @@ const ModuleNameTab = {
     exportData() {
         const filteredData = this.getFilteredData();
         if (filteredData.length === 0) {
-            alert('No data to export');
+            alert('No contacts to export');
             return;
         }
 
-        exportToCSV(filteredData, 'contacts-export');
+        exportToCSV(filteredData, 'safecare-contacts');
     },
 
     // Show success message
     showSuccess(message) {
-        // You can implement a toast notification system
         alert(message);
     },
 
@@ -326,6 +521,3 @@ const ModuleNameTab = {
         alert(message);
     }
 };
-
-// Auto-initialize when tab is shown
-// This will be called from dashboard.html when the tab is clicked
