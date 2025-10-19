@@ -109,7 +109,7 @@
             if (window[moduleName] && typeof window[moduleName].render === 'function') {
                 await window[moduleName].render();
             }
-            AdminTab.refresh()
+            await AdminTab.refresh()
         }
         
         function updateConfigStatus() {
