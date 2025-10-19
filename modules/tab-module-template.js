@@ -319,6 +319,7 @@ const ModuleNameTab = {
         alert(message);
     }
 };
+window.ModuleNameTab = ModuleNameTab; // First letter Caps...Tab
 
 // Auto-initialize when tab is shown
 // This will be called from dashboard.html when the tab is clicked
