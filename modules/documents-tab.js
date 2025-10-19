@@ -15,7 +15,7 @@ const ModuleNameTab = {
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('modulename'); // Change to your tab ID
+        const container = document.getElementById('documents'); // Change to your tab ID
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
@@ -98,7 +98,7 @@ const ModuleNameTab = {
 
     // Initialize the tab
     async init() {
-        console.log('Initializing ModuleName tab...');
+        console.log('Initializing documents tab...');
         await this.loadData();
         this.displayData();
     },
@@ -107,7 +107,7 @@ const ModuleNameTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.modulename || []; // Change to your data property
+            this.data = crmData.documents || []; // Change to your data property
             console.log(`Loaded ${this.data.length} items`);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -305,7 +305,7 @@ const ModuleNameTab = {
             return;
         }
 
-        exportToCSV(filteredData, 'modulename-export');
+        exportToCSV(filteredData, 'documents-export');
     },
 
     // Show success message
