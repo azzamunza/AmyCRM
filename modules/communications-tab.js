@@ -15,12 +15,12 @@ const ModuleNameTab = {
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('modulename'); // Change to your tab ID
+        const container = document.getElementById('communications'); // Change to your tab ID
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2>Module Name</h2>
-                <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">
+                <button class="btn btn-primary" onclick="communicationsTab.showAddModal()">
                     ➕ Add New
                 </button>
             </div>
@@ -98,7 +98,7 @@ const ModuleNameTab = {
 
     // Initialize the tab
     async init() {
-        console.log('Initializing ModuleName tab...');
+        console.log('Initializing communications tab...');
         await this.loadData();
         this.displayData();
     },
@@ -107,7 +107,7 @@ const ModuleNameTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.modulename || []; // Change to your data property
+            this.data = crmData.communications || []; // Change to your data property
             console.log(`Loaded ${this.data.length} items`);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -305,7 +305,7 @@ const ModuleNameTab = {
             return;
         }
 
-        exportToCSV(filteredData, 'modulename-export');
+        exportToCSV(filteredData, 'communications-export');
     },
 
     // Show success message
