@@ -36,7 +36,7 @@
     </div>
 
     <div class="content">
-    <!-- Dashboard Tab -->
+        <!-- Tab Containers - Content rendered by modules -->
         <div id="dashboard" class="tab-content active"></div>
         <div id="contacts" class="tab-content"></div>
         <div id="communications" class="tab-content"></div>
@@ -46,18 +46,13 @@
         <div id="settings" class="tab-content"></div>
     </div>
 
-    
-
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="crm.js"></script>
     
-        <!-- Module Scripts -->
+    <!-- Module Scripts -->
     <script src="modules/dashboard-tab.js"></script>
     <script src="modules/contacts-tab.js"></script>
-    <script src="modules/communications-tab.js"></script>
-    <script src="modules/documents-tab.js"></script>
-    <script src="modules/incidents-tab.js"></script>
     <script src="modules/admin-tab.js"></script>
     <script src="modules/settings-tab.js"></script>
     
@@ -65,51 +60,56 @@
         let currentUser = null;
         let CONFIG = window.CRM_CONFIG;
 
-        // Check authentication on page load
         window.addEventListener('DOMContentLoaded', async () => {
             currentUser = checkAuth();
             if (!currentUser) {
-                return; // checkAuth will redirect
+                return;
             }
-
+            
+            // Make currentUser available globally for modules
+            window.currentUser = currentUser;
+            
             await initDashboard();
         });
 
         async function initDashboard() {
             console.log('Initializing dashboard for:', currentUser.email);
-            console.log('User role:', currentUser.role); // Add this to debug
+            console.log('User role:', currentUser.role);
             
             document.getElementById('currentUserName').textContent = currentUser.name;
             document.getElementById('currentUserRole').textContent = 
                 currentUser.role === 'admin' ? 'Administrator' : 'User';
             
-            // Show admin tab if user is admin
             if (currentUser.role === 'admin') {
                 document.getElementById('adminTab').style.display = 'block';
             }
-        
+
             await DashboardTab.render();
         }
 
-        async function showTab(tabName) {
+        async function showTab(tabName, event) {
+            // Update tab content visibility
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
             
+            // Update nav tab styling
             document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
             
+            // Find and activate the correct nav tab
             const navTabs = document.querySelectorAll('.nav-tab');
             navTabs.forEach(tab => {
                 if (tab.getAttribute('onclick')?.includes(`'${tabName}'`)) {
                     tab.classList.add('active');
                 }
             });
-        
+
+            // Render the tab module
             const moduleName = tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Tab';
             if (window[moduleName] && typeof window[moduleName].render === 'function') {
                 await window[moduleName].render();
             }
         }
-        
+
         function updateConfigStatus() {
             const statusEl = document.getElementById('configStatus');
             if (!statusEl) return;
