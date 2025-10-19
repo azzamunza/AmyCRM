@@ -41,16 +41,16 @@ const DashboardTab = {
             <div class="card" style="margin-bottom: 30px;">
                 <h3 style="margin-bottom: 20px;">Quick Actions</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                    <button class="btn btn-primary" onclick="showTab('contacts')">
+                    <button class="btn btn-primary" onclick="DashboardTab.quickAction('contacts')">
                         👤 Add Contact
                     </button>
-                    <button class="btn btn-primary" onclick="showTab('communications')">
+                    <button class="btn btn-primary" onclick="DashboardTab.quickAction('communications')">
                         💬 Log Communication
                     </button>
-                    <button class="btn btn-primary" onclick="showTab('documents')">
+                    <button class="btn btn-primary" onclick="DashboardTab.quickAction('documents')">
                         📄 Upload Document
                     </button>
-                    <button class="btn btn-primary" onclick="showTab('incidents')">
+                    <button class="btn btn-primary" onclick="DashboardTab.quickAction('incidents')">
                         ⚠️ Report Incident
                     </button>
                 </div>
@@ -157,5 +157,10 @@ const DashboardTab = {
         this.displayStats();
         this.displayRecentActivity();
         this.displayOpenIncidents();
+    },
+
+    // Quick action handler
+    quickAction(tabName) {
+        showTab(tabName);
     }
 };
