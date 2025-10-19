@@ -112,6 +112,8 @@ const AdminTab = {
 
     async init() {
         // Check if user is admin
+         await this.loadCurrentUser(); // ensure user is loaded first
+        
         if (!requireAdmin(window.currentUser)) {
             document.getElementById('admin').innerHTML = `
                 <div class="card">
