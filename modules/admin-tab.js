@@ -351,4 +351,4 @@ const AdminTab = {
         this.displayUsers();
     }
 };
-window.ContactsTab = AdminTab;
+window.AdminTab = AdminTab;
