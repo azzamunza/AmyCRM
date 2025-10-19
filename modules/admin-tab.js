@@ -6,16 +6,24 @@ const AdminTab = {
     async render() {
         const container = document.getElementById('admin');
         
+        console.log('Admin Panel render() - currentUser:', window.currentUser);
+        
         // Check if user is admin FIRST, before rendering anything
         if (!window.currentUser || window.currentUser.role !== 'admin') {
+            console.log('Admin access denied - role:', window.currentUser?.role);
             container.innerHTML = `
                 <div class="card">
                     <h3 style="color: var(--danger);">Access Denied</h3>
                     <p>You do not have permission to access the admin panel.</p>
+                    <p style="margin-top: 10px; font-size: 0.9em; color: var(--text-light);">
+                        Current role: ${window.currentUser?.role || 'none'}
+                    </p>
                 </div>
             `;
             return;
         }
+        
+        console.log('Admin access granted, rendering panel...');
         
         container.innerHTML = `
             <h2 style="margin-bottom: 30px;">Admin Panel</h2>
