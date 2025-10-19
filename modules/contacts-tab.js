@@ -66,23 +66,23 @@ const ModuleNameTab = {
                     </div>
                     <form id="moduleForm" onsubmit="ModuleNameTab.handleSubmit(event)">
                         <!-- Add your form fields here -->
-                        <div class="form-group">
-                            <label>Name *</label>
-                            <input type="text" id="itemName" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Description</label>
-                            <textarea id="itemDescription" rows="4"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select id="itemStatus">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
+                        // Add contact-specific fields
+                           <div class="form-group">
+                               <label>Full Name *</label>
+                               <input type="text" id="contactName" required>
+                           </div>
+                           <div class="form-group">
+                               <label>Email</label>
+                               <input type="email" id="contactEmail">
+                           </div>
+                           <div class="form-group">
+                               <label>Phone</label>
+                               <input type="tel" id="contactPhone">
+                           </div>
+                           <div class="form-group">
+                               <label>Organization</label>
+                               <input type="text" id="contactOrganization">
+                           </div>
 
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
@@ -115,6 +115,13 @@ const ModuleNameTab = {
         }
     },
 
+    async addItem(data) {
+       await addContact(data); // From crm.js
+   }
+
+   async updateItem(id, data) {
+       await updateContact(id, data); // From crm.js
+   }
     // Display data in the UI
     displayData() {
         const contentEl = document.getElementById('moduleContent');
