@@ -319,7 +319,7 @@ const DocumentsTab = {
         alert(message);
     }
 };
-window.ContactsTab = DocumentsTab;
+window.DocumentsTab = DocumentsTab;
 
 // Auto-initialize when tab is shown
 // This will be called from dashboard.html when the tab is clicked
