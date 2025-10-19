@@ -308,6 +308,21 @@ const DocumentsTab = {
         exportToCSV(filteredData, 'Documents-export');
     },
 
+    async addItem(data) {
+        await addDocument(data);
+    },
+    
+    async updateItem(id, data) {
+        await updateDocument(id, data);
+    },
+    
+    async deleteItem(itemId) {
+        await deleteDocument(itemId);
+        await this.loadData();
+        this.displayData();
+        this.showSuccess('Document deleted successfully');
+    },
+
     // Show success message
     showSuccess(message) {
         // You can implement a toast notification system
