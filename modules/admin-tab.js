@@ -111,10 +111,13 @@ const AdminTab = {
     },
 
     async init() {
-        // Check if user is admin
-         await this.loadCurrentUser(); // ensure user is loaded first
+        console.log('Initializing Admin Panel...');
         
-        if (!requireAdmin(window.currentUser)) {
+        // Wait a tick to ensure currentUser is available
+        await new Promise(resolve => setTimeout(resolve, 0));
+        
+        // Check if user is admin
+        if (!window.currentUser || !requireAdmin(window.currentUser)) {
             document.getElementById('admin').innerHTML = `
                 <div class="card">
                     <h3 style="color: var(--danger);">Access Denied</h3>
@@ -124,22 +127,24 @@ const AdminTab = {
             return;
         }
 
-        console.log('Initializing Admin Panel...');
         await this.loadUsers();
-        this.displayUsers();
+        this.updateStatistics();
+        this.displayUsers('all');
     },
 
     async loadUsers() {
         try {
             this.users = await fetchUsers();
             console.log(`Loaded ${this.users.length} users`);
-            this.updateStatistics();
         } catch (error) {
             console.error('Error loading users:', error);
-            document.getElementById('userManagementList').innerHTML = 
-                `<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--danger);">
-                    Error loading users: ${error.message}
-                </td></tr>`;
+            const tbody = document.getElementById('userManagementList');
+            if (tbody) {
+                tbody.innerHTML = 
+                    `<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--danger);">
+                        Error loading users: ${error.message}
+                    </td></tr>`;
+            }
         }
     },
 
@@ -350,7 +355,13 @@ const AdminTab = {
 
     async refresh() {
         await this.loadUsers();
-        this.displayUsers();
+        this.updateStatistics();
+        // Re-display with current filter
+        const activeTab = document.querySelector('.filter-tab.active');
+        const filter = activeTab ? activeTab.dataset.filter : 'all';
+        this.displayUsers(filter);
     }
 };
+
+// Make available globally
 window.AdminTab = AdminTab;
