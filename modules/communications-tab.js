@@ -107,7 +107,7 @@ const CommunicationsTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.Communications || []; // Change to your data property
+            this.data = crmData.communications || []; // Change to your data property
             console.log(`Loaded ${this.data.length} items`);
         } catch (error) {
             console.error('Error loading data:', error);
