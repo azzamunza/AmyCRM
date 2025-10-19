@@ -338,3 +338,4 @@ const SettingsTab = {
         return 'Unknown';
     }
 };
+window.SettingsTab = SettingsTab;
