@@ -108,7 +108,6 @@ const AdminTab = {
         `;
 
         await this.init();
-        AdminTab.refresh()
     },
 
     async init() {
@@ -128,6 +127,7 @@ const AdminTab = {
         console.log('Initializing Admin Panel...');
         await this.loadUsers();
         this.displayUsers();
+        AdminTab.refresh()
     },
 
     async loadUsers() {
