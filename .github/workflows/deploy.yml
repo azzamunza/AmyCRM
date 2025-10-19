@@ -38,6 +38,8 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site
+          mkdir -p _site/modules
+          
           cp index.html _site/
           cp dashboard.html _site/
           cp config.js _site/
@@ -46,6 +48,7 @@ jobs:
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
+          cp modules/*.js _site/modules/
           
           if [ -d "images" ]; then
             mkdir -p _site/images
