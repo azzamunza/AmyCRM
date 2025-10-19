@@ -20,7 +20,7 @@ const IncidentsTab = {
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2>Module Name</h2>
-                <button class="btn btn-primary" onclick="incidentsTab.showAddModal()">
+                <button class="btn btn-primary" onclick="IncidentsTab.showAddModal()">
                     ➕ Add New
                 </button>
             </div>
