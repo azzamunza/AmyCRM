@@ -77,8 +77,8 @@
 
         async function initDashboard() {
             console.log('Initializing dashboard for:', currentUser.email);
+            console.log('User role:', currentUser.role); // Add this to debug
             
-            // Set user info
             document.getElementById('currentUserName').textContent = currentUser.name;
             document.getElementById('currentUserRole').textContent = 
                 currentUser.role === 'admin' ? 'Administrator' : 'User';
@@ -88,7 +88,6 @@
                 document.getElementById('adminTab').style.display = 'block';
             }
         
-            // Load initial dashboard
             await DashboardTab.render();
         }
 
