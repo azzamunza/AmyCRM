@@ -15,7 +15,7 @@ const CommunicationsTab = {
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('Communications'); // Change to your tab ID
+        const container = document.getElementById('communications'); // Change to your tab ID
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
