@@ -308,6 +308,21 @@ const CommunicationsTab = {
         exportToCSV(filteredData, 'Communications-export');
     },
 
+    async addItem(data) {
+        await addCommunication(data);
+    },
+    
+    async updateItem(id, data) {
+        await updateCommunication(id, data);
+    },
+    
+    async deleteItem(itemId) {
+        await deleteCommunication(itemId);
+        await this.loadData();
+        this.displayData();
+        this.showSuccess('Communication deleted successfully');
+    },
+
     // Show success message
     showSuccess(message) {
         // You can implement a toast notification system
