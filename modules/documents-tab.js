@@ -2,7 +2,7 @@
 // Copy this file and rename it to: [tabname]-tab.js
 // Replace all instances of "ModuleName" with your actual module name (e.g., "Contacts", "Documents")
 
-const ModuleNameTab = {
+const DocumentsTab = {
     // Module state
     data: [],
     filters: {
@@ -15,12 +15,12 @@ const ModuleNameTab = {
 
     // Render the tab HTML
     async render() {
-        const container = document.getElementById('documents'); // Change to your tab ID
+        const container = document.getElementById('Documents'); // Change to your tab ID
         
         container.innerHTML = `
             <div class="tab-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <h2>Module Name</h2>
-                <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">
+                <button class="btn btn-primary" onclick="DocumentsTab.showAddModal()">
                     ➕ Add New
                 </button>
             </div>
@@ -34,17 +34,17 @@ const ModuleNameTab = {
                             type="text" 
                             id="moduleSearchInput" 
                             placeholder="Search..." 
-                            oninput="ModuleNameTab.handleSearch(this.value)"
+                            oninput="DocumentsTab.handleSearch(this.value)"
                         >
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <select onchange="ModuleNameTab.handleFilter('status', this.value)">
+                    <select onchange="DocumentsTab.handleFilter('status', this.value)">
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button class="btn btn-secondary btn-sm" onclick="ModuleNameTab.exportData()">
+                    <button class="btn btn-secondary btn-sm" onclick="DocumentsTab.exportData()">
                         📥 Export
                     </button>
                 </div>
@@ -62,9 +62,9 @@ const ModuleNameTab = {
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3 id="modalTitle">Add New Item</h3>
-                        <button class="modal-close" onclick="ModuleNameTab.closeModal()">✕</button>
+                        <button class="modal-close" onclick="DocumentsTab.closeModal()">✕</button>
                     </div>
-                    <form id="moduleForm" onsubmit="ModuleNameTab.handleSubmit(event)">
+                    <form id="moduleForm" onsubmit="DocumentsTab.handleSubmit(event)">
                         <!-- Add your form fields here -->
                         <div class="form-group">
                             <label>Name *</label>
@@ -86,7 +86,7 @@ const ModuleNameTab = {
 
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
                             <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
-                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="ModuleNameTab.closeModal()">Cancel</button>
+                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="DocumentsTab.closeModal()">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -98,7 +98,7 @@ const ModuleNameTab = {
 
     // Initialize the tab
     async init() {
-        console.log('Initializing documents tab...');
+        console.log('Initializing Documents tab...');
         await this.loadData();
         this.displayData();
     },
@@ -107,7 +107,7 @@ const ModuleNameTab = {
     async loadData() {
         try {
             const crmData = await fetchCRMData();
-            this.data = crmData.documents || []; // Change to your data property
+            this.data = crmData.Documents || []; // Change to your data property
             console.log(`Loaded ${this.data.length} items`);
         } catch (error) {
             console.error('Error loading data:', error);
@@ -126,7 +126,7 @@ const ModuleNameTab = {
                     <div class="empty-state-icon">📋</div>
                     <h3>No items found</h3>
                     <p>Get started by adding your first item</p>
-                    <button class="btn btn-primary" onclick="ModuleNameTab.showAddModal()">Add New Item</button>
+                    <button class="btn btn-primary" onclick="DocumentsTab.showAddModal()">Add New Item</button>
                 </div>
             `;
             return;
@@ -149,10 +149,10 @@ const ModuleNameTab = {
                         </div>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn-sm btn-primary" onclick="ModuleNameTab.showEditModal(${item.id})">
+                        <button class="btn-sm btn-primary" onclick="DocumentsTab.showEditModal(${item.id})">
                             ✏️ Edit
                         </button>
-                        <button class="btn-sm btn-danger" onclick="ModuleNameTab.confirmDelete(${item.id})">
+                        <button class="btn-sm btn-danger" onclick="DocumentsTab.confirmDelete(${item.id})">
                             🗑️ Delete
                         </button>
                     </div>
@@ -305,7 +305,7 @@ const ModuleNameTab = {
             return;
         }
 
-        exportToCSV(filteredData, 'documents-export');
+        exportToCSV(filteredData, 'Documents-export');
     },
 
     // Show success message
