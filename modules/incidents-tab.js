@@ -308,6 +308,21 @@ const IncidentsTab = {
         exportToCSV(filteredData, 'incidents-export');
     },
 
+    async addItem(data) {
+        await addIncident(data);
+    },
+    
+    async updateItem(id, data) {
+        await updateIncident(id, data);
+    },
+    
+    async deleteItem(itemId) {
+        await deleteIncident(itemId);
+        await this.loadData();
+        this.displayData();
+        this.showSuccess('Incident deleted successfully');
+    },
+
     // Show success message
     showSuccess(message) {
         // You can implement a toast notification system
