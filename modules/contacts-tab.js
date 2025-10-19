@@ -521,3 +521,5 @@ const ContactsTab = {
         alert(message);
     }
 };
+
+window.ContactsTab = ContactsTab;
