@@ -48,7 +48,10 @@ jobs:
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
-          cp modules/*.js _site/modules/
+          
+          if [ -d "modules" ]; then
+            cp modules/*.js _site/modules/
+          fi
           
           if [ -d "images" ]; then
             mkdir -p _site/images
@@ -57,6 +60,8 @@ jobs:
           
           echo "Built site contents:"
           ls -la _site/
+          echo "Modules:"
+          ls -la _site/modules/ 2>/dev/null || echo "No modules found"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
   deploy:
