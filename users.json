@@ -18,5 +18,15 @@
     "role": "admin",
     "status": "approved",
     "createdAt": "2025-10-18T07:47:04.947Z"
+  },
+  {
+    "id": 1760848550115,
+    "name": "Aaron Munro",
+    "email": "aaron@vector6.com.au",
+    "phone": "+61477742636",
+    "password": "YWNzcjkyNTI5NA==",
+    "role": "user",
+    "status": "pending",
+    "createdAt": "2025-10-19T04:35:50.115Z"
   }
 ]
