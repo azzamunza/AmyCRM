@@ -2,7 +2,7 @@
 // Copy this file and rename it to: [tabname]-tab.js
 // Replace all instances of "ModuleName" with your actual module name (e.g., "Contacts", "Documents")
 
-const incidentsTab = {
+const IncidentsTab = {
     // Module state
     data: [],
     filters: {
