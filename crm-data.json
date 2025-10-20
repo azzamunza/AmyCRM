@@ -15,7 +15,16 @@
     }
   ],
   "communications": [],
-  "documents": [],
+  "documents": [
+    {
+      "id": 1760960927442,
+      "name": "Test",
+      "description": "Info about document",
+      "status": "active",
+      "createdAt": "2025-10-20T11:48:47.442Z",
+      "createdBy": "azzamunza@gmail.com"
+    }
+  ],
   "incidents": [],
-  "lastUpdated": "2025-10-19T04:19:47.990Z"
+  "lastUpdated": "2025-10-20T11:48:47.445Z"
 }
