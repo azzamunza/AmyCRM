@@ -112,7 +112,7 @@
     </div>
 
     <script src="config.js"></script>
-    <script src="auth.js"></script>
+    <script src="auth.js" onerror="console.error('Failed to load auth.js - check file path')"></script>
     <script>
         let CONFIG = window.CRM_CONFIG;
         let googleScriptLoaded = false;
