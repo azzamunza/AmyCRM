@@ -285,7 +285,7 @@
                     name: name,
                     email: email,
                     phone: phone,
-                    password: btoa(password),
+                    password: '', //changed from: btoa(password)
                     role: 'user',
                     status: 'pending',
                     createdAt: new Date().toISOString()
