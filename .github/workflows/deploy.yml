@@ -45,6 +45,10 @@ jobs:
           cp config.js _site/
           cp auth.js _site/
           cp crm.js _site/
+          cp encryption-local.js _site/
+          cp encryption-kms.js _site/
+          cp encryption.js _site/
+          cp communications-storage.js _site/
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
