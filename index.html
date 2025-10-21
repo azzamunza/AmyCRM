@@ -1,13 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeCare CRM - Dashboard</title>
-    <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="shared.css">
-    <link rel="stylesheet" href="login.css">
-</head>
 <body>
     <div class="login-container">
         <div class="login-left">
@@ -228,7 +218,9 @@
                     id: user.id,
                     name: user.name,
                     email: user.email,
-                    role: user.role
+                    role: user.role,
+                    loginType: 'google',
+                    credential: email // Use email as credential for Google login
                 };
 
                 localStorage.setItem('userSession', JSON.stringify(currentUser));
@@ -392,7 +384,7 @@
                             name: data.name || 'Administrator',
                             email: email,
                             phone: '',
-                            password: 'q1w2e3r4t5y',
+                            password: '',
                             role: 'admin',
                             status: 'approved',
                             createdAt: new Date().toISOString()
@@ -414,7 +406,9 @@
                     id: user.id,
                     name: user.name,
                     email: user.email,
-                    role: user.role
+                    role: user.role,
+                    loginType: 'email',
+                    credential: password // Use password as credential for email login
                 };
         
                 localStorage.setItem('userSession', JSON.stringify(currentUser));
