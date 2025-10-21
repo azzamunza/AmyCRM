@@ -1,105 +1,219 @@
-// encryption.js - Encryption controller (routes to local or KMS)
+// encryption-local.js - Web Crypto API local encryption implementation
 
-const EncryptionService = {
-    // Current active encryption module
-    _activeModule: null,
-    _loginType: null,
+const EncryptionLocal = {
+    config: {
+        saltVersion: 'safecare-v1-salt',
+        ivLength: 12,
+        iterations: 100000,
+        algorithm: 'AES-GCM',
+        keyLength: 256
+    },
+
+    // Session-only storage for derived key
+    _derivedKey: null,
+    _keyIdentifier: null,
 
     /**
-     * Initialize encryption based on login type
-     * @param {string} identifier - User email or unique ID
+     * Derive encryption key from user identity
+     * @param {string} identifier - User email or unique identifier
      * @param {string} loginType - 'google' | 'apple' | 'email' | 'passkey'
-     * @param {string} credential - Password or credential (optional)
+     * @param {string} credential - Password or OAuth token (optional)
      * @returns {Promise<void>}
      */
-    async initializeFromLogin(identifier, loginType, credential = null) {
+    async deriveKeyFromIdentity(identifier, loginType, credential = null) {
         try {
-            console.log('Initializing encryption for', loginType, 'login');
+            console.log(`Deriving encryption key from ${loginType} login for:`, identifier);
 
-            // Check if KMS is configured and active
-            const useKMS = window.CRM_CONFIG?.USE_KMS === true && EncryptionKMS.config.active;
+            let keyMaterial;
+            const encoder = new TextEncoder();
 
-            if (useKMS) {
-                console.log('Using Google Cloud KMS encryption');
-                this._activeModule = EncryptionKMS;
-                await EncryptionKMS.initialize(window.CRM_CONFIG.GCP_PROJECT_ID);
-            } else {
-                console.log('Using local Web Crypto API encryption');
-                this._activeModule = EncryptionLocal;
-                await EncryptionLocal.deriveKeyFromIdentity(identifier, loginType, credential);
+            switch (loginType) {
+                case 'google':
+                case 'apple':
+                    // Derive from verified email address
+                    // For OAuth logins, the email IS the credential
+                    keyMaterial = encoder.encode(
+                        (credential || identifier) + this.config.saltVersion
+                    );
+                    break;
+
+                case 'email':
+                    // Derive from email + password
+                    if (!credential) {
+                        throw new Error('Password required for email login encryption');
+                    }
+                    keyMaterial = encoder.encode(identifier + credential + this.config.saltVersion);
+                    break;
+
+                case 'passkey':
+                    // Derive from passkey credential ID
+                    if (!credential) {
+                        throw new Error('Passkey credential required for encryption');
+                    }
+                    keyMaterial = encoder.encode(identifier + credential + this.config.saltVersion);
+                    break;
+
+                default:
+                    throw new Error(`Unknown login type: ${loginType}`);
             }
 
-            this._loginType = loginType;
-            console.log('✓ Encryption initialized successfully');
+            // Import key material
+            const importedKey = await crypto.subtle.importKey(
+                'raw',
+                keyMaterial,
+                { name: 'PBKDF2' },
+                false,
+                ['deriveKey']
+            );
+
+            // Derive AES-GCM key using PBKDF2
+            this._derivedKey = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: encoder.encode(this.config.saltVersion),
+                    iterations: this.config.iterations,
+                    hash: 'SHA-256'
+                },
+                importedKey,
+                {
+                    name: this.config.algorithm,
+                    length: this.config.keyLength
+                },
+                false,
+                ['encrypt', 'decrypt']
+            );
+
+            this._keyIdentifier = await this.hashIdentifier(identifier);
+            
+            // Mark encryption as ready
+            sessionStorage.setItem('encryptionReady', 'true');
+            sessionStorage.setItem('encryptionType', 'local');
+            
+            console.log('✓ Encryption key derived successfully');
         } catch (error) {
-            console.error('Failed to initialize encryption:', error);
+            console.error('Error deriving encryption key:', error);
             throw error;
         }
     },
 
     /**
-     * Check if encryption is ready
+     * Hash identifier for verification without storing plaintext
+     * @param {string} identifier - User identifier
+     * @returns {Promise<string>} - Base64 hash
+     */
+    async hashIdentifier(identifier) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(identifier + this.config.saltVersion);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return btoa(String.fromCharCode(...hashArray));
+    },
+
+    /**
+     * Check if encryption key is available
      * @returns {boolean}
      */
     isReady() {
-        return this._activeModule !== null && this._activeModule.isReady();
+        return this._derivedKey !== null;
     },
 
     /**
-     * Get current encryption type
-     * @returns {string} - 'local' | 'kms' | 'none'
-     */
-    getEncryptionType() {
-        if (!this._activeModule) return 'none';
-        return this._activeModule === EncryptionLocal ? 'local' : 'kms';
-    },
-
-    /**
-     * Clear encryption key on logout
+     * Clear encryption key from memory
      */
     clearKey() {
-        if (this._activeModule) {
-            this._activeModule.clearKey();
-        }
-        this._activeModule = null;
-        this._loginType = null;
-        console.log('✓ Encryption service cleared');
+        this._derivedKey = null;
+        this._keyIdentifier = null;
+        sessionStorage.removeItem('encryptionReady');
+        sessionStorage.removeItem('encryptionType');
+        console.log('✓ Encryption key cleared from memory');
     },
 
     /**
      * Encrypt plaintext
      * @param {string} plaintext - Data to encrypt
-     * @returns {Promise<string>} - Encrypted data
+     * @returns {Promise<string>} - Base64 encoded IV + ciphertext
      */
     async encrypt(plaintext) {
         if (!this.isReady()) {
-            throw new Error('Encryption not initialized - please log in first');
+            throw new Error('Encryption key not initialized. Please log in first.');
         }
-        return await this._activeModule.encrypt(plaintext);
+
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(plaintext);
+
+            // Generate random IV
+            const iv = crypto.getRandomValues(new Uint8Array(this.config.ivLength));
+
+            // Encrypt data
+            const encrypted = await crypto.subtle.encrypt(
+                {
+                    name: this.config.algorithm,
+                    iv: iv
+                },
+                this._derivedKey,
+                data
+            );
+
+            // Combine IV and ciphertext
+            const combined = new Uint8Array(iv.length + encrypted.byteLength);
+            combined.set(iv);
+            combined.set(new Uint8Array(encrypted), iv.length);
+
+            // Encode as Base64
+            return btoa(String.fromCharCode(...combined));
+        } catch (error) {
+            console.error('Encryption error:', error);
+            throw new Error('Failed to encrypt data');
+        }
     },
 
     /**
      * Decrypt ciphertext
-     * @param {string} encryptedData - Encrypted data
+     * @param {string} encryptedData - Base64 encoded IV + ciphertext
      * @returns {Promise<string>} - Decrypted plaintext
      */
     async decrypt(encryptedData) {
         if (!this.isReady()) {
-            throw new Error('Encryption not initialized - please log in first');
+            throw new Error('Encryption key not initialized. Please log in first.');
         }
-        return await this._activeModule.decrypt(encryptedData);
+
+        try {
+            // Decode from Base64
+            const combined = new Uint8Array(
+                atob(encryptedData).split('').map(c => c.charCodeAt(0))
+            );
+
+            // Extract IV and ciphertext
+            const iv = combined.slice(0, this.config.ivLength);
+            const data = combined.slice(this.config.ivLength);
+
+            // Decrypt
+            const decrypted = await crypto.subtle.decrypt(
+                {
+                    name: this.config.algorithm,
+                    iv: iv
+                },
+                this._derivedKey,
+                data
+            );
+
+            const decoder = new TextDecoder();
+            return decoder.decode(decrypted);
+        } catch (error) {
+            console.error('Decryption error:', error);
+            throw new Error('Decryption failed - data may be corrupted or encrypted with different key');
+        }
     },
 
     /**
      * Encrypt a JavaScript object
      * @param {Object} obj - Object to encrypt
-     * @returns {Promise<string>} - Encrypted JSON
+     * @returns {Promise<string>} - Encrypted JSON string
      */
     async encryptObject(obj) {
-        if (!this.isReady()) {
-            throw new Error('Encryption not initialized - please log in first');
-        }
-        return await this._activeModule.encryptObject(obj);
+        const json = JSON.stringify(obj);
+        return await this.encrypt(json);
     },
 
     /**
@@ -108,57 +222,23 @@ const EncryptionService = {
      * @returns {Promise<Object>} - Decrypted object
      */
     async decryptObject(encryptedData) {
-        if (!this.isReady()) {
-            throw new Error('Encryption not initialized - please log in first');
-        }
-        return await this._activeModule.decryptObject(encryptedData);
+        const json = await this.decrypt(encryptedData);
+        return JSON.parse(json);
     },
 
     /**
-     * Get encryption metadata
-     * @returns {Object} - Metadata about current encryption
+     * Get key metadata for verification
+     * @returns {Object} - Key metadata
      */
-    getMetadata() {
-        if (!this._activeModule) {
-            return {
-                ready: false,
-                type: 'none',
-                loginType: null
-            };
-        }
-
+    getKeyMetadata() {
         return {
-            ...this._activeModule.getKeyMetadata(),
-            loginType: this._loginType,
-            type: this.getEncryptionType()
+            ready: this.isReady(),
+            identifier: this._keyIdentifier,
+            algorithm: this.config.algorithm,
+            keyLength: this.config.keyLength,
+            saltVersion: this.config.saltVersion
         };
-    },
-
-    /**
-     * Helper: Hash password for storage (one-way)
-     * @param {string} password - Plain password
-     * @returns {Promise<string>} - Base64 hashed password
-     */
-    async hashPassword(password) {
-        const encoder = new TextEncoder();
-        const salt = 'safecare-v1-salt';
-        const data = encoder.encode(password + salt);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return btoa(String.fromCharCode(...hashArray));
-    },
-
-    /**
-     * Helper: Verify password against hash
-     * @param {string} password - Plain password
-     * @param {string} hash - Stored hash
-     * @returns {Promise<boolean>}
-     */
-    async verifyPassword(password, hash) {
-        const computed = await this.hashPassword(password);
-        return computed === hash;
     }
 };
 
-// Expose globally
-window.EncryptionService = EncryptionService;
+window.EncryptionLocal = EncryptionLocal;
