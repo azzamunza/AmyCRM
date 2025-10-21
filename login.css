@@ -167,6 +167,48 @@
     border-color: var(--primary);
 }
 
+/* --- Added Styles --- */
+
+.divider span {
+    background: white;
+    padding: 0 15px;
+    position: relative;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.alert-success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+.alert-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.alert-info {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+.alert-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+/* --- Responsive --- */
 @media (max-width: 968px) {
     .login-container {
         flex-direction: column;
