@@ -418,7 +418,7 @@
                     email: user.email,
                     role: user.role,
                     loginType: 'email',
-                    credential: password // Use password as credential for email login
+                    credential: user.createdAt // Use password as credential for email login
                 };
         
                 localStorage.setItem('userSession', JSON.stringify(currentUser));
