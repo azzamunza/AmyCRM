@@ -49,15 +49,15 @@
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="crm.js"></script>
+    <script src="encryption-local.js"></script>
+    <script src="encryption-kms.js"></script>
+    <script src="encryption.js"></script>
     
     <!-- Module Scripts -->
     <script src="modules/dashboard-tab.js"></script>
     <script src="modules/contacts-tab.js"></script>
     <script src="modules/admin-tab.js"></script>
     <script src="modules/settings-tab.js"></script>
-    <script src="modules/communications-tab.js"></script>
-    <script src="modules/documents-tab.js"></script>
-    <script src="modules/incidents-tab.js"></script>
     
     <script>
         let currentUser = null;
@@ -72,12 +72,40 @@
             // Make currentUser available globally for modules
             window.currentUser = currentUser;
             
+            // Initialize encryption from login credentials
+            await initializeEncryption();
+            
             await initDashboard();
         });
 
+        async function initializeEncryption() {
+            try {
+                console.log('Initializing encryption...');
+                
+                const loginType = currentUser.loginType || 'email';
+                const credential = currentUser.credential || null;
+                
+                await EncryptionService.initializeFromLogin(
+                    currentUser.email,
+                    loginType,
+                    credential
+                );
+                
+                console.log('✓ Encryption ready:', EncryptionService.getMetadata());
+                
+                // Clear credential from memory after key derivation
+                if (currentUser.credential) {
+                    delete currentUser.credential;
+                    localStorage.setItem('userSession', JSON.stringify(currentUser));
+                }
+            } catch (error) {
+                console.error('Failed to initialize encryption:', error);
+                alert('Encryption initialization failed. Some features may not work correctly.');
+            }
+        }
+
         async function initDashboard() {
             console.log('Initializing dashboard for:', currentUser.email);
-            console.log('User role:', currentUser.role);
             
             document.getElementById('currentUserName').textContent = currentUser.name;
             document.getElementById('currentUserRole').textContent = 
