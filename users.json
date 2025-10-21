@@ -18,5 +18,15 @@
     "role": "admin",
     "status": "approved",
     "createdAt": "2025-10-18T07:47:04.947Z"
+  },
+  {
+    "id": 1761053168785,
+    "name": "Azza Munza",
+    "email": "aaron@vector6.com.au",
+    "phone": "+61477742636",
+    "password": "",
+    "role": "user",
+    "status": "pending",
+    "createdAt": "2025-10-21T13:26:08.785Z"
   }
 ]
