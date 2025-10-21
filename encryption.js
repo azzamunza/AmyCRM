@@ -1,5 +1,4 @@
 // encryption-local.js - Web Crypto API local encryption implementation
-
 const EncryptionLocal = {
     config: {
         saltVersion: 'safecare-v1-salt',
