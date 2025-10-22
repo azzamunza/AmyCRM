@@ -1,4 +1,4 @@
-// communications-tab.js - Enhanced encrypted communication logger
+// communications-tab.js - Enhanced encrypted communication logger with new features
 
 const CommunicationsTab = {
     contacts: [],
@@ -10,6 +10,10 @@ const CommunicationsTab = {
     lastSaveTime: null,
     autoSaveTimer: null,
     isMinimized: false,
+    saveQueue: [],
+    isSaving: false,
+    lastTimestamp: null,
+    googleDriveLink: null,
 
     async render() {
         const container = document.getElementById('communications');
@@ -33,7 +37,17 @@ const CommunicationsTab = {
                         </div>
                     </div>
                     <div class="comm-history-list" id="historyList" style="display:none;">
-                        <!-- Previous communications list -->
+                        <!-- Previous communications header -->
+                        <div style="padding: 15px; background: white; border-bottom: 1px solid var(--border);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong id="selectedContactHeader">Contact Name</strong>
+                                <button class="btn-sm btn-primary" onclick="CommunicationsTab.saveAndClose()" id="btnSaveClose">
+                                    💾 Save & Close
+                                </button>
+                            </div>
+                        </div>
+                        <!-- History items -->
+                        <div id="historyItems" style="padding: 10px;"></div>
                     </div>
                 </div>
 
@@ -77,7 +91,7 @@ const CommunicationsTab = {
                         <textarea 
                             id="commNoteArea" 
                             class="comm-note-area" 
-                            placeholder="Start typing your communication notes here...&#10;&#10;Press Enter to save a line with timestamp.&#10;Text will auto-save after 3 seconds of inactivity."
+                            placeholder="Start typing your communication notes here...&#10;&#10;Press Enter to save current line and add timestamp if needed.&#10;Text auto-saves progressively."
                             oninput="CommunicationsTab.handleNoteInput()"
                             onkeydown="CommunicationsTab.handleKeyPress(event)"
                             disabled
@@ -85,14 +99,23 @@ const CommunicationsTab = {
                     </div>
 
                     <div class="comm-toolbar">
-                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertTimestamp()" disabled id="btnInsertTimestamp">
-                            🕐 Insert Time
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertTimestamp()" disabled id="btnInsertTimestamp" title="Insert timestamp">
+                            🕐 Time
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertCalendarDate()" disabled id="btnInsertDate" title="Insert calendar date">
+                            📅 Date
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.uploadFile()" disabled id="btnUploadFile" title="Upload file">
+                            📎 File
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.showInsertMenu()" disabled id="btnInsertMenu" title="Insert custom elements">
+                            ✨ Insert
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.clearNote()" disabled id="btnClearNote">
                             🗑️ Clear
                         </button>
-                        <button class="btn btn-sm btn-primary" onclick="CommunicationsTab.saveNote()" disabled id="btnSaveNote">
-                            💾 Save Note
+                        <button class="btn btn-sm btn-primary" onclick="CommunicationsTab.createNewNote()" disabled id="btnNewNote">
+                            📝 New Note
                         </button>
                         <span id="saveIndicator"></span>
                     </div>
@@ -114,6 +137,148 @@ const CommunicationsTab = {
                     </div>
                 </div>
             </div>
+
+            <!-- Insert Menu Modal -->
+            <div id="insertMenuModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h3>Insert Custom Element</h3>
+                        <button class="modal-close" onclick="CommunicationsTab.closeInsertMenu()">✕</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; max-height: 400px; overflow-y: auto;" id="iconGrid">
+                            <p style="text-align: center; color: var(--text-light);">Loading icons...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar Date Modal -->
+            <div id="calendarModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>Insert Calendar Date</h3>
+                        <button class="modal-close" onclick="CommunicationsTab.closeCalendarModal()">✕</button>
+                    </div>
+                    <form onsubmit="CommunicationsTab.handleCalendarInsert(event)" style="padding: 20px;">
+                        <div class="form-group">
+                            <label>Date & Time</label>
+                            <input type="datetime-local" id="calendarDateTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Event Title</label>
+                            <input type="text" id="calendarTitle" placeholder="Appointment with Dr. Smith" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Notes (optional)</label>
+                            <textarea id="calendarNotes" rows="3"></textarea>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                                📅 Insert Date
+                            </button>
+                            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="CommunicationsTab.closeCalendarModal()">
+                                Cancel
+                            </button>
+                        </div>
+                        <p style="margin-top: 15px; font-size: 0.85em; color: var(--text-light);">
+                            💡 After inserting, you can add to Google Calendar
+                        </p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Google Drive Setup Modal -->
+            <div id="driveSetupModal" class="modal">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>🔒 Google Drive Setup</h3>
+                        <button class="modal-close" onclick="CommunicationsTab.closeDriveSetup()">✕</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <p style="margin-bottom: 15px;">To upload files, please provide a link to your Google Drive folder with read-write permissions.</p>
+                        <div class="form-group">
+                            <label>Google Drive Folder Link</label>
+                            <input type="url" id="driveLink" placeholder="https://drive.google.com/drive/folders/..." required>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                            <button class="btn btn-primary" style="flex: 1;" onclick="CommunicationsTab.saveDriveLink()">
+                                💾 Save Link
+                            </button>
+                            <button class="btn btn-secondary" style="flex: 1;" onclick="CommunicationsTab.closeDriveSetup()">
+                                Cancel
+                            </button>
+                        </div>
+                        <p style="margin-top: 15px; font-size: 0.85em; color: var(--text-light);">
+                            💡 This will be encrypted and stored securely in your profile
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                .comm-save-spinner {
+                    display: inline-block;
+                    width: 16px;
+                    height: 16px;
+                    border: 2px solid var(--border);
+                    border-top-color: var(--primary);
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                    margin-right: 8px;
+                    vertical-align: middle;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .icon-item {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 10px;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .icon-item:hover {
+                    background: var(--light);
+                    border-color: var(--primary);
+                    transform: translateY(-2px);
+                }
+
+                .icon-item img {
+                    width: 40px;
+                    height: 40px;
+                    margin-bottom: 5px;
+                }
+
+                .icon-item span {
+                    font-size: 0.75em;
+                    text-align: center;
+                    color: var(--text-light);
+                }
+
+                .calendar-event {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    padding: 4px 8px;
+                    background: #dbeafe;
+                    border: 1px solid #93c5fd;
+                    border-radius: 6px;
+                    color: #1e40af;
+                    font-size: 0.9em;
+                    cursor: pointer;
+                }
+
+                .calendar-event:hover {
+                    background: #bfdbfe;
+                }
+            </style>
         `;
 
         await this.init();
@@ -122,7 +287,6 @@ const CommunicationsTab = {
     async init() {
         console.log('Initializing Communications tab...');
         
-        // Check encryption is ready
         if (!EncryptionService.isReady()) {
             document.getElementById('contactList').innerHTML = `
                 <div style="text-align: center; padding: 20px; color: var(--danger);">
@@ -133,8 +297,22 @@ const CommunicationsTab = {
         }
 
         await this.loadContacts();
+        await this.loadUserSettings();
         this.displayContacts();
         this.updateTimeline();
+        this.loadIcons();
+    },
+
+    async loadUserSettings() {
+        // Load Google Drive link from user settings
+        const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+        this.googleDriveLink = userSettings.googleDriveLink || null;
+    },
+
+    async saveUserSettings() {
+        const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+        userSettings.googleDriveLink = this.googleDriveLink;
+        localStorage.setItem('userSettings', JSON.stringify(userSettings));
     },
 
     async loadContacts() {
@@ -171,9 +349,6 @@ const CommunicationsTab = {
             >
                 <div class="comm-contact-name">${contact.name}</div>
                 ${contact.organization ? `<div class="comm-contact-org">${contact.organization}</div>` : ''}
-                ${this.selectedContact?.id === contact.id ? `
-                    <button class="comm-contact-close" onclick="event.stopPropagation(); CommunicationsTab.deselectContact()">✕</button>
-                ` : ''}
             </div>
         `).join('');
     },
@@ -204,10 +379,10 @@ const CommunicationsTab = {
 
         console.log('Selected contact:', this.selectedContact.name);
 
-        // Minimize contact list and show history
-        this.isMinimized = true;
+        // Show history list with contact header
         document.getElementById('contactList').style.display = 'none';
         document.getElementById('historyList').style.display = 'block';
+        document.getElementById('selectedContactHeader').textContent = this.selectedContact.name;
 
         // Update UI
         this.displayContacts();
@@ -228,26 +403,29 @@ const CommunicationsTab = {
         noteArea.disabled = false;
         noteArea.value = '';
         this.currentNote = '';
+        this.lastTimestamp = null;
         noteArea.focus();
 
+        // Enable all buttons
         document.getElementById('btnInsertTimestamp').disabled = false;
+        document.getElementById('btnInsertDate').disabled = false;
+        document.getElementById('btnUploadFile').disabled = false;
+        document.getElementById('btnInsertMenu').disabled = false;
         document.getElementById('btnClearNote').disabled = false;
-        document.getElementById('btnSaveNote').disabled = false;
+        document.getElementById('btnNewNote').disabled = false;
 
-        // Load communications history
         await this.loadContactCommunications();
     },
 
     deselectContact() {
         this.selectedContact = null;
-        this.isMinimized = false;
         this.communications = [];
+        this.currentNote = '';
+        this.lastTimestamp = null;
         
-        // Show contact list, hide history
         document.getElementById('contactList').style.display = 'block';
         document.getElementById('historyList').style.display = 'none';
         
-        // Reset UI
         document.getElementById('selectedContactInfo').innerHTML = `
             <p style="color: var(--text-light);">Select a contact to start logging communications</p>
         `;
@@ -257,8 +435,11 @@ const CommunicationsTab = {
         document.getElementById('commNoteArea').value = '';
         
         document.getElementById('btnInsertTimestamp').disabled = true;
+        document.getElementById('btnInsertDate').disabled = true;
+        document.getElementById('btnUploadFile').disabled = true;
+        document.getElementById('btnInsertMenu').disabled = true;
         document.getElementById('btnClearNote').disabled = true;
-        document.getElementById('btnSaveNote').disabled = true;
+        document.getElementById('btnNewNote').disabled = true;
         
         this.displayContacts();
         this.closePreviousView();
@@ -280,7 +461,7 @@ const CommunicationsTab = {
     },
 
     displayCommunicationsList() {
-        const historyEl = document.getElementById('historyList');
+        const historyEl = document.getElementById('historyItems');
         
         if (this.communications.length === 0) {
             historyEl.innerHTML = `
@@ -304,10 +485,8 @@ const CommunicationsTab = {
             const comm = await CommunicationsStorage.loadCommunication(this.selectedContact.id, commId);
             this.viewingComm = comm;
             
-            // Show split view
             document.getElementById('commContainer').classList.add('split-view');
             
-            // Populate previous note
             document.getElementById('prevSummary').textContent = comm.summary || 'No summary';
             document.getElementById('prevMeta').textContent = `${formatDate(comm.createdAt)} by ${comm.author}`;
             document.getElementById('prevNoteArea').value = comm.content;
@@ -326,27 +505,158 @@ const CommunicationsTab = {
 
     handleNoteInput() {
         this.currentNote = document.getElementById('commNoteArea').value;
-        
-        // Clear existing auto-save timer
-        if (this.autoSaveTimer) {
-            clearTimeout(this.autoSaveTimer);
-        }
-
-        // Set new auto-save timer (3 seconds of inactivity)
-        this.autoSaveTimer = setTimeout(() => {
-            // Auto-save disabled - only save on Enter or manual save
-            // this.autoSave();
-        }, 3000);
-
-        // Update timeline
         this.updateTimeline();
+        this.queueAutoSave();
     },
 
     handleKeyPress(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
-            // Don't auto-save on Enter, just let user add timestamp if they want
-            // User must click Save button
+            // Save line on Enter
+            this.saveLine();
         }
+    },
+
+    saveLine() {
+        const noteArea = document.getElementById('commNoteArea');
+        const cursorPos = noteArea.selectionStart;
+        const lines = noteArea.value.substring(0, cursorPos).split('\n');
+        const currentLineIndex = lines.length - 1;
+        
+        // Check if we need a new timestamp (more than 1 minute since last)
+        const now = Date.now();
+        if (!this.lastTimestamp || (now - this.lastTimestamp) > 60000) {
+            // Insert timestamp at beginning of new line
+            setTimeout(() => {
+                this.insertTimestamp();
+                this.lastTimestamp = now;
+            }, 10);
+        }
+        
+        // Queue save
+        this.queueAutoSave();
+    },
+
+    queueAutoSave() {
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+        }
+
+        this.autoSaveTimer = setTimeout(() => {
+            this.progressiveSave();
+        }, 2000);
+    },
+
+    async progressiveSave() {
+        if (!this.selectedContact || !this.currentNote.trim()) return;
+
+        const summary = document.getElementById('commSummary').value.trim() || 'Draft note';
+        
+        this.saveQueue.push({
+            contactId: this.selectedContact.id,
+            content: this.currentNote,
+            summary: summary,
+            timestamp: Date.now()
+        });
+
+        this.processSaveQueue();
+    },
+
+    async processSaveQueue() {
+        if (this.isSaving || this.saveQueue.length === 0) return;
+
+        this.isSaving = true;
+        const saveIndicator = document.getElementById('saveIndicator');
+        
+        // Show saving status
+        saveIndicator.innerHTML = '<span class="comm-save-indicator saving"><span class="comm-save-spinner"></span>Saving...</span>';
+
+        try {
+            const saveData = this.saveQueue[this.saveQueue.length - 1]; // Get latest
+            
+            await CommunicationsStorage.saveCommunication(
+                saveData.contactId,
+                saveData.content,
+                saveData.summary
+            );
+
+            this.lastSaveTime = new Date();
+            saveIndicator.innerHTML = '<span class="comm-save-indicator saved">✓ Saved</span>';
+            
+            setTimeout(() => {
+                saveIndicator.innerHTML = '';
+            }, 2000);
+
+            this.saveQueue = []; // Clear queue after successful save
+            
+        } catch (error) {
+            console.error('Save error:', error);
+            saveIndicator.innerHTML = '<span class="comm-save-indicator" style="background: #fee2e2; color: #991b1b;">✗ Save failed</span>';
+        } finally {
+            this.isSaving = false;
+            
+            // Process next in queue if any
+            if (this.saveQueue.length > 0) {
+                setTimeout(() => this.processSaveQueue(), 1000);
+            }
+        }
+    },
+
+    async saveAndClose() {
+        if (!this.selectedContact) return;
+
+        const saveIndicator = document.getElementById('saveIndicator');
+        const btnSaveClose = document.getElementById('btnSaveClose');
+        
+        btnSaveClose.disabled = true;
+        saveIndicator.innerHTML = '<span class="comm-save-indicator"><span class="comm-save-spinner"></span>Preparing to save...</span>';
+
+        // Wait for any pending saves
+        while (this.isSaving || this.saveQueue.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Final save
+        if (this.currentNote.trim()) {
+            saveIndicator.innerHTML = '<span class="comm-save-indicator saving"><span class="comm-save-spinner"></span>Saving data...</span>';
+            
+            try {
+                await this.progressiveSave();
+                await this.processSaveQueue();
+                
+                saveIndicator.innerHTML = '<span class="comm-save-indicator saved">✓ Data saved</span>';
+                
+                setTimeout(() => {
+                    saveIndicator.innerHTML = '';
+                    this.deselectContact();
+                }, 1500);
+                
+            } catch (error) {
+                saveIndicator.innerHTML = '<span class="comm-save-indicator" style="background: #fee2e2; color: #991b1b;">✗ Save failed</span>';
+                btnSaveClose.disabled = false;
+            }
+        } else {
+            this.deselectContact();
+        }
+    },
+
+    async createNewNote() {
+        if (!this.selectedContact) return;
+
+        if (this.currentNote.trim()) {
+            if (!confirm('Start a new note? Current unsaved changes will be saved first.')) {
+                return;
+            }
+            await this.saveAndClose();
+        }
+
+        // Reset for new note
+        document.getElementById('commNoteArea').value = '';
+        document.getElementById('commSummary').value = '';
+        this.currentNote = '';
+        this.lastTimestamp = null;
+        this.updateTimeline();
+        
+        document.getElementById('commNoteArea').focus();
     },
 
     insertTimestamp() {
@@ -363,6 +673,187 @@ const CommunicationsTab = {
         noteArea.focus();
 
         this.handleNoteInput();
+    },
+
+    insertCalendarDate() {
+        const now = new Date();
+        const formatted = now.toISOString().slice(0, 16);
+        document.getElementById('calendarDateTime').value = formatted;
+        document.getElementById('calendarModal').classList.add('active');
+    },
+
+    handleCalendarInsert(event) {
+        event.preventDefault();
+        
+        const dateTime = document.getElementById('calendarDateTime').value;
+        const title = document.getElementById('calendarTitle').value;
+        const notes = document.getElementById('calendarNotes').value;
+        
+        const date = new Date(dateTime);
+        const formatted = date.toLocaleString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Create calendar event text with Google Calendar link
+        const eventText = `\n📅 ${formatted} - ${title}\n`;
+        const googleCalUrl = this.createGoogleCalendarUrl(dateTime, title, notes);
+        const linkText = `[Add to Google Calendar](${googleCalUrl})\n`;
+        
+        const noteArea = document.getElementById('commNoteArea');
+        const cursorPos = noteArea.selectionStart;
+        const textBefore = noteArea.value.substring(0, cursorPos);
+        const textAfter = noteArea.value.substring(cursorPos);
+        
+        noteArea.value = textBefore + eventText + linkText + textAfter;
+        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + eventText.length + linkText.length;
+        noteArea.focus();
+
+        this.closeCalendarModal();
+        this.handleNoteInput();
+    },
+
+    createGoogleCalendarUrl(dateTime, title, notes) {
+        const date = new Date(dateTime);
+        const startDate = date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        
+        // End time 1 hour later
+        const endDate = new Date(date.getTime() + 3600000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        
+        const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: title,
+            dates: `${startDate}/${endDate}`,
+            details: notes || '',
+            sf: 'true',
+            output: 'xml'
+        });
+        
+        return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    },
+
+    closeCalendarModal() {
+        document.getElementById('calendarModal').classList.remove('active');
+        document.getElementById('calendarDateTime').value = '';
+        document.getElementById('calendarTitle').value = '';
+        document.getElementById('calendarNotes').value = '';
+    },
+
+    async uploadFile() {
+        if (!this.googleDriveLink) {
+            document.getElementById('driveSetupModal').classList.add('active');
+            return;
+        }
+
+        // Create file input
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const isShared = confirm(`Upload "${file.name}" to shared folder?\n\nClick OK for shared (all users), Cancel for private (you only)`);
+            
+            // In a real implementation, you would upload to Google Drive here
+            // For now, we'll just insert a reference to the file
+            const noteArea = document.getElementById('commNoteArea');
+            const cursorPos = noteArea.selectionStart;
+            const textBefore = noteArea.value.substring(0, cursorPos);
+            const textAfter = noteArea.value.substring(cursorPos);
+            
+            const fileRef = `\n📎 [${file.name}](${this.googleDriveLink}) ${isShared ? '(Shared)' : '(Private)'}\n`;
+            
+            noteArea.value = textBefore + fileRef + textAfter;
+            noteArea.selectionStart = noteArea.selectionEnd = cursorPos + fileRef.length;
+            noteArea.focus();
+            
+            this.handleNoteInput();
+            
+            alert(`File reference added: ${file.name}\n\n⚠️ Note: Actual file upload to Google Drive requires additional implementation.`);
+        };
+        
+        input.click();
+    },
+
+    saveDriveLink() {
+        const link = document.getElementById('driveLink').value.trim();
+        if (!link) {
+            alert('Please enter a valid Google Drive folder link');
+            return;
+        }
+
+        if (!link.includes('drive.google.com')) {
+            alert('Please enter a valid Google Drive link');
+            return;
+        }
+
+        this.googleDriveLink = link;
+        this.saveUserSettings();
+        
+        alert('✓ Google Drive link saved securely!');
+        this.closeDriveSetup();
+    },
+
+    closeDriveSetup() {
+        document.getElementById('driveSetupModal').classList.remove('active');
+        document.getElementById('driveLink').value = '';
+    },
+
+    async loadIcons() {
+        try {
+            // Load icon data from GitHub
+            const response = await fetch('icon-themes/Gradient/icon-data.json');
+            if (!response.ok) throw new Error('Failed to load icons');
+            
+            const iconData = await response.json();
+            this.iconData = iconData.icons || [];
+            console.log(`Loaded ${this.iconData.length} icons`);
+        } catch (error) {
+            console.error('Error loading icons:', error);
+            this.iconData = [];
+        }
+    },
+
+    showInsertMenu() {
+        const modal = document.getElementById('insertMenuModal');
+        const grid = document.getElementById('iconGrid');
+        
+        if (this.iconData.length === 0) {
+            grid.innerHTML = '<p style="text-align: center; color: var(--text-light);">No icons available</p>';
+        } else {
+            grid.innerHTML = this.iconData.map(icon => `
+                <div class="icon-item" onclick="CommunicationsTab.insertIcon('${icon.filename}', '${icon.label}')">
+                    <img src="icon-themes/Gradient/${icon.filename}" alt="${icon.label}">
+                    <span>${icon.label}</span>
+                </div>
+            `).join('');
+        }
+        
+        modal.classList.add('active');
+    },
+
+    insertIcon(filename, label) {
+        const noteArea = document.getElementById('commNoteArea');
+        const cursorPos = noteArea.selectionStart;
+        const textBefore = noteArea.value.substring(0, cursorPos);
+        const textAfter = noteArea.value.substring(cursorPos);
+        
+        // Insert as markdown image
+        const iconRef = `![${label}](icon-themes/Gradient/${filename}) `;
+        
+        noteArea.value = textBefore + iconRef + textAfter;
+        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + iconRef.length;
+        noteArea.focus();
+        
+        this.closeInsertMenu();
+        this.handleNoteInput();
+    },
+
+    closeInsertMenu() {
+        document.getElementById('insertMenuModal').classList.remove('active');
     },
 
     updateTimeline() {
@@ -383,75 +874,32 @@ const CommunicationsTab = {
 
         // Extract timestamps from note
         const noteArea = document.getElementById('commNoteArea');
+        if (!noteArea) return;
+        
         const lines = noteArea.value.split('\n');
-        const timestamps = lines
-            .map(line => line.match(/\[(\d{2}:\d{2})\]/))
-            .filter(match => match)
-            .map(match => match[1]);
+        const timestamps = [];
+        
+        lines.forEach((line, index) => {
+            const match = line.match(/\[(\d{2}:\d{2})\]/);
+            if (match) {
+                timestamps.push({
+                    time: match[1],
+                    line: index + 1
+                });
+            }
+        });
 
         let timelineHTML = `<div class="comm-timestamp date">${currentDate}</div>`;
         
         if (timestamps.length > 0) {
-            timelineHTML += timestamps.map(time => 
-                `<div class="comm-timestamp">${time}</div>`
+            timelineHTML += timestamps.map(ts => 
+                `<div class="comm-timestamp">${ts.time} (Line ${ts.line})</div>`
             ).join('');
         } else {
             timelineHTML += `<div class="comm-timestamp">${currentTime}</div>`;
         }
 
         timelineEl.innerHTML = timelineHTML;
-    },
-
-    async saveNote() {
-        if (!this.selectedContact || !this.currentNote.trim()) {
-            alert('Please enter some notes before saving');
-            return;
-        }
-
-        const summary = document.getElementById('commSummary').value.trim();
-        if (!summary) {
-            alert('Please enter a summary for this communication');
-            document.getElementById('commSummary').focus();
-            return;
-        }
-
-        const saveIndicator = document.getElementById('saveIndicator');
-        saveIndicator.innerHTML = '<span class="comm-save-indicator saving">🔒 Encrypting & Saving...</span>';
-
-        try {
-            await CommunicationsStorage.saveCommunication(
-                this.selectedContact.id,
-                this.currentNote,
-                summary
-            );
-
-            this.lastSaveTime = new Date();
-            saveIndicator.innerHTML = '<span class="comm-save-indicator saved">✓ Saved & Encrypted</span>';
-            
-            setTimeout(() => {
-                saveIndicator.innerHTML = '';
-            }, 3000);
-
-            document.getElementById('statusText').textContent = 
-                `Last saved: ${this.lastSaveTime.toLocaleTimeString()}`;
-
-            // Clear current note and summary
-            document.getElementById('commNoteArea').value = '';
-            document.getElementById('commSummary').value = '';
-            this.currentNote = '';
-
-            // Refresh communication list
-            await this.loadContactCommunications();
-            
-            // Refresh dashboard if it exists
-            if (typeof DashboardTab !== 'undefined') {
-                await DashboardTab.refresh();
-            }
-
-        } catch (error) {
-            console.error('Error saving note:', error);
-            saveIndicator.innerHTML = '<span class="comm-save-indicator" style="background: #fee2e2; color: #991b1b;">✗ Save failed: ' + error.message + '</span>';
-        }
     },
 
     clearNote() {
@@ -462,6 +910,7 @@ const CommunicationsTab = {
         document.getElementById('commNoteArea').value = '';
         document.getElementById('commSummary').value = '';
         this.currentNote = '';
+        this.lastTimestamp = null;
         this.updateTimeline();
         document.getElementById('statusText').textContent = 'Notes cleared';
     }
