@@ -1,710 +1,470 @@
-/* dashboard.css - Dashboard page specific styles */
+// communications-tab.js - Enhanced encrypted communication logger
 
-.app-header {
-    background: white;
-    border-bottom: 1px solid var(--border);
-    padding: 20px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
+const CommunicationsTab = {
+    contacts: [],
+    selectedContact: null,
+    searchQuery: '',
+    currentNote: '',
+    communications: [],
+    viewingComm: null,
+    lastSaveTime: null,
+    autoSaveTimer: null,
+    isMinimized: false,
 
-.app-header-left {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
+    async render() {
+        const container = document.getElementById('communications');
+        
+        container.innerHTML = `
+            <div class="comm-container" id="commContainer">
+                <!-- Left Sidebar: Contact List & History -->
+                <div class="comm-sidebar">
+                    <div class="comm-sidebar-header">
+                        <h3 style="margin-bottom: 10px; font-size: 1.1em;">Contacts</h3>
+                        <input 
+                            type="text" 
+                            class="comm-search" 
+                            placeholder="🔍 Search contacts..."
+                            oninput="CommunicationsTab.handleContactSearch(this.value)"
+                        >
+                    </div>
+                    <div class="comm-contact-list" id="contactList">
+                        <div style="text-align: center; padding: 40px 20px; color: var(--text-light);">
+                            Loading contacts...
+                        </div>
+                    </div>
+                    <div class="comm-history-list" id="historyList" style="display:none;">
+                        <!-- Previous communications list -->
+                    </div>
+                </div>
 
-.app-logo {
-    font-size: 1.8em;
-}
+                <!-- Previous Note View (Split View) -->
+                <div class="comm-previous" id="previousView">
+                    <div class="comm-previous-header">
+                        <strong>Previous Note</strong>
+                        <button class="comm-previous-close" onclick="CommunicationsTab.closePreviousView()">✕</button>
+                    </div>
+                    <div class="comm-editor-container">
+                        <div style="padding: 15px; background: white; border-radius: 8px; margin-bottom: 10px;">
+                            <strong id="prevSummary">Summary</strong>
+                            <div style="font-size: 0.85em; color: var(--text-light); margin-top: 5px;" id="prevMeta">Date</div>
+                        </div>
+                        <textarea 
+                            id="prevNoteArea" 
+                            class="comm-note-area" 
+                            readonly
+                            style="background: white;"
+                        ></textarea>
+                    </div>
+                </div>
 
-.app-title h1 {
-    font-size: 1.5em;
-    color: var(--text);
-}
+                <!-- Middle: Current Note Editor -->
+                <div class="comm-main">
+                    <div class="comm-main-header">
+                        <div id="selectedContactInfo">
+                            <p style="color: var(--text-light);">Select a contact to start logging communications</p>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="commSummary" 
+                            class="comm-summary-input" 
+                            placeholder="Communication summary (e.g., 'Phone call regarding appointment')"
+                            disabled
+                            style="display:none;"
+                        >
+                    </div>
+                    
+                    <div class="comm-editor-container">
+                        <textarea 
+                            id="commNoteArea" 
+                            class="comm-note-area" 
+                            placeholder="Start typing your communication notes here...&#10;&#10;Press Enter to save a line with timestamp.&#10;Text will auto-save after 3 seconds of inactivity."
+                            oninput="CommunicationsTab.handleNoteInput()"
+                            onkeydown="CommunicationsTab.handleKeyPress(event)"
+                            disabled
+                        ></textarea>
+                    </div>
 
-.app-header-right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
+                    <div class="comm-toolbar">
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertTimestamp()" disabled id="btnInsertTimestamp">
+                            🕐 Insert Time
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="CommunicationsTab.clearNote()" disabled id="btnClearNote">
+                            🗑️ Clear
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="CommunicationsTab.saveNote()" disabled id="btnSaveNote">
+                            💾 Save Note
+                        </button>
+                        <span id="saveIndicator"></span>
+                    </div>
 
-.user-info {
-    text-align: right;
-}
+                    <div class="comm-status">
+                        <span id="statusText">Ready</span>
+                    </div>
+                </div>
 
-.user-name {
-    font-weight: 600;
-    color: var(--text);
-}
+                <!-- Right: Timeline -->
+                <div class="comm-timeline">
+                    <div class="comm-timeline-header">
+                        Timeline
+                    </div>
+                    <div class="comm-timeline-content" id="timelineContent">
+                        <p style="text-align: center; color: var(--text-light); font-size: 0.9em;">
+                            Timestamps will appear here as you type
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
 
-.user-role {
-    font-size: 12px;
-    color: var(--text-light);
-}
+        await this.init();
+    },
 
-.btn-logout {
-    padding: 10px 20px;
-    background: var(--light);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--text);
-}
+    async init() {
+        console.log('Initializing Communications tab...');
+        
+        // Check encryption is ready
+        if (!EncryptionService.isReady()) {
+            document.getElementById('contactList').innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--danger);">
+                    Encryption not initialized. Please refresh the page.
+                </div>
+            `;
+            return;
+        }
 
-.btn-logout:hover {
-    background: var(--border);
-}
+        await this.loadContacts();
+        this.displayContacts();
+        this.updateTimeline();
+    },
 
-.nav-tabs {
-    display: flex;
-    background: white;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    padding: 0 40px;
-}
+    async loadContacts() {
+        try {
+            this.contacts = await getContacts();
+            console.log(`Loaded ${this.contacts.length} contacts`);
+        } catch (error) {
+            console.error('Error loading contacts:', error);
+            document.getElementById('contactList').innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--danger);">
+                    Error loading contacts
+                </div>
+            `;
+        }
+    },
 
-.nav-tab {
-    padding: 15px 25px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 15px;
-    color: var(--text-light);
-    transition: all 0.3s;
-    white-space: nowrap;
-    border-bottom: 3px solid transparent;
-    font-weight: 500;
-}
+    displayContacts() {
+        const listEl = document.getElementById('contactList');
+        const filtered = this.getFilteredContacts();
 
-.nav-tab:hover {
-    color: var(--primary);
-}
+        if (filtered.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--text-light);">
+                    No contacts found
+                </div>
+            `;
+            return;
+        }
 
-.nav-tab.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    font-weight: 600;
-}
+        listEl.innerHTML = filtered.map(contact => `
+            <div 
+                class="comm-contact-item ${this.selectedContact?.id === contact.id ? 'active' : ''}" 
+                onclick="CommunicationsTab.selectContact(${contact.id})"
+            >
+                <div class="comm-contact-name">${contact.name}</div>
+                ${contact.organization ? `<div class="comm-contact-org">${contact.organization}</div>` : ''}
+                ${this.selectedContact?.id === contact.id ? `
+                    <button class="comm-contact-close" onclick="event.stopPropagation(); CommunicationsTab.deselectContact()">✕</button>
+                ` : ''}
+            </div>
+        `).join('');
+    },
 
-.content {
-    padding: 40px;
-    max-width: 1400px;
-    margin: 0 auto;
-}
+    getFilteredContacts() {
+        if (!this.searchQuery) {
+            return this.contacts.sort((a, b) => a.name.localeCompare(b.name));
+        }
 
-.tab-content {
-    display: none;
-}
+        const query = this.searchQuery.toLowerCase();
+        return this.contacts
+            .filter(c => 
+                c.name.toLowerCase().includes(query) ||
+                c.organization?.toLowerCase().includes(query) ||
+                c.email?.toLowerCase().includes(query)
+            )
+            .sort((a, b) => a.name.localeCompare(b.name));
+    },
 
-.tab-content.active {
-    display: block;
-    animation: fadeIn 0.3s;
-}
+    handleContactSearch(value) {
+        this.searchQuery = value;
+        this.displayContacts();
+    },
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-}
+    async selectContact(contactId) {
+        this.selectedContact = this.contacts.find(c => c.id === contactId);
+        if (!this.selectedContact) return;
 
-.stat-card {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 25px;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    transition: all 0.3s;
-}
+        console.log('Selected contact:', this.selectedContact.name);
 
-.stat-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transform: translateY(-2px);
-}
+        // Minimize contact list and show history
+        this.isMinimized = true;
+        document.getElementById('contactList').style.display = 'none';
+        document.getElementById('historyList').style.display = 'block';
 
-.stat-number {
-    font-size: 2.5em;
-    font-weight: bold;
-    color: var(--primary);
-    margin-bottom: 5px;
-}
+        // Update UI
+        this.displayContacts();
+        document.getElementById('selectedContactInfo').innerHTML = `
+            <h3 style="margin-bottom: 5px;">${this.selectedContact.name}</h3>
+            <p style="color: var(--text-light); font-size: 0.9em;">
+                ${this.selectedContact.organization || 'No organization'} • ${this.selectedContact.type || 'Contact'}
+            </p>
+        `;
 
-.stat-label {
-    color: var(--text-light);
-    font-size: 0.95em;
-}
+        // Show summary input
+        const summaryInput = document.getElementById('commSummary');
+        summaryInput.style.display = 'block';
+        summaryInput.disabled = false;
 
-.admin-section {
-    border-left: 4px solid var(--warning);
-    padding-left: 20px;
-}
+        // Enable note taking
+        const noteArea = document.getElementById('commNoteArea');
+        noteArea.disabled = false;
+        noteArea.value = '';
+        this.currentNote = '';
+        noteArea.focus();
 
-.user-management-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
+        document.getElementById('btnInsertTimestamp').disabled = false;
+        document.getElementById('btnClearNote').disabled = false;
+        document.getElementById('btnSaveNote').disabled = false;
 
-.user-management-table th,
-.user-management-table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-}
+        // Load communications history
+        await this.loadContactCommunications();
+    },
 
-.user-management-table th {
-    background: var(--light);
-    font-weight: 600;
-}
+    deselectContact() {
+        this.selectedContact = null;
+        this.isMinimized = false;
+        this.communications = [];
+        
+        // Show contact list, hide history
+        document.getElementById('contactList').style.display = 'block';
+        document.getElementById('historyList').style.display = 'none';
+        
+        // Reset UI
+        document.getElementById('selectedContactInfo').innerHTML = `
+            <p style="color: var(--text-light);">Select a contact to start logging communications</p>
+        `;
+        
+        document.getElementById('commSummary').style.display = 'none';
+        document.getElementById('commNoteArea').disabled = true;
+        document.getElementById('commNoteArea').value = '';
+        
+        document.getElementById('btnInsertTimestamp').disabled = true;
+        document.getElementById('btnClearNote').disabled = true;
+        document.getElementById('btnSaveNote').disabled = true;
+        
+        this.displayContacts();
+        this.closePreviousView();
+    },
 
-.user-management-table tr:hover {
-    background: var(--light);
-}
+    async loadContactCommunications() {
+        try {
+            this.communications = await CommunicationsStorage.listCommunications(this.selectedContact.id);
+            console.log(`Loaded ${this.communications.length} communications for:`, this.selectedContact.name);
+            
+            this.displayCommunicationsList();
+            
+            document.getElementById('statusText').textContent = 
+                `${this.selectedContact.name} (${this.communications.length} previous communications)`;
+        } catch (error) {
+            console.error('Error loading communications:', error);
+            document.getElementById('statusText').textContent = 'Error loading communications';
+        }
+    },
 
-/* Activity Feed */
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 15px;
-    padding: 15px;
-    border-left: 3px solid var(--border);
-    margin-bottom: 10px;
-    transition: all 0.3s;
-}
+    displayCommunicationsList() {
+        const historyEl = document.getElementById('historyList');
+        
+        if (this.communications.length === 0) {
+            historyEl.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--text-light); font-size: 0.9em;">
+                    No previous communications
+                </div>
+            `;
+            return;
+        }
 
-.activity-item:hover {
-    border-left-color: var(--primary);
-    background: var(--light);
-}
+        historyEl.innerHTML = this.communications.map(comm => `
+            <div class="comm-history-item" onclick="CommunicationsTab.viewCommunication('${comm.id}')">
+                <div class="comm-history-date">${formatDate(comm.timestamp)}</div>
+                <div class="comm-history-summary">${comm.summary || 'No summary'}</div>
+            </div>
+        `).join('');
+    },
 
-.activity-icon {
-    font-size: 1.5em;
-    min-width: 40px;
-    text-align: center;
-}
+    async viewCommunication(commId) {
+        try {
+            const comm = await CommunicationsStorage.loadCommunication(this.selectedContact.id, commId);
+            this.viewingComm = comm;
+            
+            // Show split view
+            document.getElementById('commContainer').classList.add('split-view');
+            
+            // Populate previous note
+            document.getElementById('prevSummary').textContent = comm.summary || 'No summary';
+            document.getElementById('prevMeta').textContent = `${formatDate(comm.createdAt)} by ${comm.author}`;
+            document.getElementById('prevNoteArea').value = comm.content;
+            
+            console.log('Viewing communication:', comm.id);
+        } catch (error) {
+            console.error('Error loading communication:', error);
+            alert('Failed to load communication');
+        }
+    },
 
-.activity-content {
-    flex: 1;
-}
+    closePreviousView() {
+        document.getElementById('commContainer').classList.remove('split-view');
+        this.viewingComm = null;
+    },
 
-.activity-description {
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 5px;
-}
+    handleNoteInput() {
+        this.currentNote = document.getElementById('commNoteArea').value;
+        
+        // Clear existing auto-save timer
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+        }
 
-.activity-meta {
-    font-size: 0.85em;
-    color: var(--text-light);
-}
+        // Set new auto-save timer (3 seconds of inactivity)
+        this.autoSaveTimer = setTimeout(() => {
+            // Auto-save disabled - only save on Enter or manual save
+            // this.autoSave();
+        }, 3000);
 
-/* Contact List */
-.contact-list {
-    display: grid;
-    gap: 15px;
-}
+        // Update timeline
+        this.updateTimeline();
+    },
 
-.contact-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    transition: all 0.3s;
-}
+    handleKeyPress(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            // Don't auto-save on Enter, just let user add timestamp if they want
+            // User must click Save button
+        }
+    },
 
-.contact-item:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transform: translateX(5px);
-}
+    insertTimestamp() {
+        const noteArea = document.getElementById('commNoteArea');
+        const now = new Date();
+        const timestamp = `[${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}] `;
+        
+        const cursorPos = noteArea.selectionStart;
+        const textBefore = noteArea.value.substring(0, cursorPos);
+        const textAfter = noteArea.value.substring(cursorPos);
+        
+        noteArea.value = textBefore + timestamp + textAfter;
+        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + timestamp.length;
+        noteArea.focus();
 
-.contact-info h4 {
-    color: var(--text);
-    margin-bottom: 5px;
-}
+        this.handleNoteInput();
+    },
 
-.contact-info p {
-    color: var(--text-light);
-    font-size: 0.9em;
-}
+    updateTimeline() {
+        const now = new Date();
+        const timelineEl = document.getElementById('timelineContent');
+        
+        const currentDate = now.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        
+        const currentTime = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false
+        });
 
-.contact-actions {
-    display: flex;
-    gap: 10px;
-}
+        // Extract timestamps from note
+        const noteArea = document.getElementById('commNoteArea');
+        const lines = noteArea.value.split('\n');
+        const timestamps = lines
+            .map(line => line.match(/\[(\d{2}:\d{2})\]/))
+            .filter(match => match)
+            .map(match => match[1]);
 
-/* Modal Styles */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-}
+        let timelineHTML = `<div class="comm-timestamp date">${currentDate}</div>`;
+        
+        if (timestamps.length > 0) {
+            timelineHTML += timestamps.map(time => 
+                `<div class="comm-timestamp">${time}</div>`
+            ).join('');
+        } else {
+            timelineHTML += `<div class="comm-timestamp">${currentTime}</div>`;
+        }
 
-.modal.active {
-    display: flex;
-}
+        timelineEl.innerHTML = timelineHTML;
+    },
 
-.modal-content {
-    background: white;
-    border-radius: 16px;
-    padding: 30px;
-    max-width: 600px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-    animation: fadeIn 0.3s;
-}
+    async saveNote() {
+        if (!this.selectedContact || !this.currentNote.trim()) {
+            alert('Please enter some notes before saving');
+            return;
+        }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
+        const summary = document.getElementById('commSummary').value.trim();
+        if (!summary) {
+            alert('Please enter a summary for this communication');
+            document.getElementById('commSummary').focus();
+            return;
+        }
 
-.modal-header h3 {
-    color: var(--text);
-}
+        const saveIndicator = document.getElementById('saveIndicator');
+        saveIndicator.innerHTML = '<span class="comm-save-indicator saving">🔒 Encrypting & Saving...</span>';
 
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    cursor: pointer;
-    color: var(--text-light);
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-}
+        try {
+            await CommunicationsStorage.saveCommunication(
+                this.selectedContact.id,
+                this.currentNote,
+                summary
+            );
 
-.modal-close:hover {
-    background: var(--light);
-    color: var(--text);
-}
+            this.lastSaveTime = new Date();
+            saveIndicator.innerHTML = '<span class="comm-save-indicator saved">✓ Saved & Encrypted</span>';
+            
+            setTimeout(() => {
+                saveIndicator.innerHTML = '';
+            }, 3000);
 
-/* Search Bar */
-.search-bar {
-    position: relative;
-    margin-bottom: 20px;
-}
+            document.getElementById('statusText').textContent = 
+                `Last saved: ${this.lastSaveTime.toLocaleTimeString()}`;
 
-.search-bar input {
-    padding-left: 45px;
-}
+            // Clear current note and summary
+            document.getElementById('commNoteArea').value = '';
+            document.getElementById('commSummary').value = '';
+            this.currentNote = '';
 
-.search-icon {
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-light);
-}
+            // Refresh communication list
+            await this.loadContactCommunications();
+            
+            // Refresh dashboard if it exists
+            if (typeof DashboardTab !== 'undefined') {
+                await DashboardTab.refresh();
+            }
 
-/* Toolbar */
-.toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 15px;
-}
+        } catch (error) {
+            console.error('Error saving note:', error);
+            saveIndicator.innerHTML = '<span class="comm-save-indicator" style="background: #fee2e2; color: #991b1b;">✗ Save failed: ' + error.message + '</span>';
+        }
+    },
 
-.toolbar-left,
-.toolbar-right {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
+    clearNote() {
+        if (!confirm('Clear current notes? This cannot be undone.')) {
+            return;
+        }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--text-light);
-}
-
-.empty-state-icon {
-    font-size: 4em;
-    margin-bottom: 20px;
-    opacity: 0.5;
-}
-
-.empty-state h3 {
-    color: var(--text);
-    margin-bottom: 10px;
-}
-
-/* Responsive */
-@media (max-width: 968px) {
-    .app-header {
-        flex-direction: column;
-        gap: 15px;
-        padding: 20px;
+        document.getElementById('commNoteArea').value = '';
+        document.getElementById('commSummary').value = '';
+        this.currentNote = '';
+        this.updateTimeline();
+        document.getElementById('statusText').textContent = 'Notes cleared';
     }
+};
 
-    .content {
-        padding: 20px;
-    }
-    
-    .nav-tabs {
-        padding: 0 20px;
-    }
-    
-    .toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .toolbar-left,
-    .toolbar-right {
-        width: 100%;
-    }
-    
-    .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
-    
-    .contact-item {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .contact-actions {
-        width: 100%;
-        justify-content: flex-end;
-    }
-}
-
-/* Communications Tab Styles */
-.comm-container {
-    display: grid;
-    grid-template-columns: 300px 1fr 150px;
-    gap: 0;
-    height: calc(100vh - 200px);
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-.comm-container.minimized {
-    grid-template-columns: 300px 1fr 150px;
-}
-
-.comm-container.split-view {
-    grid-template-columns: 300px 1fr 1fr 150px;
-}
-
-.comm-sidebar {
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    background: var(--light);
-    overflow: hidden;
-}
-
-.comm-sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--border);
-    background: white;
-}
-
-.comm-search {
-    width: 100%;
-    padding: 10px 12px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-}
-
-.comm-contact-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-}
-
-.comm-contact-item {
-    padding: 12px 15px;
-    margin-bottom: 5px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: white;
-    border: 1px solid var(--border);
-    position: relative;
-}
-
-.comm-contact-item:hover {
-    background: var(--primary);
-    color: white;
-    transform: translateX(5px);
-}
-
-.comm-contact-item.active {
-    background: var(--primary);
-    color: white;
-    font-weight: 600;
-}
-
-.comm-contact-close {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(255,255,255,0.2);
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: white;
-}
-
-.comm-contact-item.active .comm-contact-close {
-    display: flex;
-}
-
-.comm-contact-close:hover {
-    background: rgba(255,255,255,0.3);
-}
-
-.comm-contact-name {
-    font-weight: 600;
-    margin-bottom: 3px;
-}
-
-.comm-contact-org {
-    font-size: 0.85em;
-    opacity: 0.8;
-}
-
-.comm-history-list {
-    padding: 10px;
-    overflow-y: auto;
-}
-
-.comm-history-item {
-    padding: 10px;
-    margin-bottom: 8px;
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.comm-history-item:hover {
-    background: var(--light);
-    transform: translateX(3px);
-}
-
-.comm-history-date {
-    font-size: 0.85em;
-    color: var(--text-light);
-    margin-bottom: 5px;
-}
-
-.comm-history-summary {
-    font-weight: 600;
-    font-size: 0.9em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.comm-main {
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border-right: 1px solid var(--border);
-}
-
-.comm-previous {
-    display: none;
-    flex-direction: column;
-    background: var(--light);
-    border-right: 1px solid var(--border);
-}
-
-.comm-container.split-view .comm-previous {
-    display: flex;
-}
-
-.comm-main-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--light);
-}
-
-.comm-summary-input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    font-size: 14px;
-    margin-top: 10px;
-}
-
-.comm-editor-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
-    overflow-y: auto;
-}
-
-.comm-note-area {
-    flex: 1;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    padding: 15px;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.6;
-    resize: none;
-    min-height: 300px;
-}
-
-.comm-note-area:focus {
-    outline: none;
-    border-color: var(--primary);
-}
-
-.comm-note-area:disabled {
-    background: var(--light);
-    cursor: not-allowed;
-}
-
-.comm-toolbar {
-    display: flex;
-    gap: 10px;
-    padding: 15px 20px;
-    border-top: 1px solid var(--border);
-    background: var(--light);
-    flex-wrap: wrap;
-}
-
-.comm-timeline {
-    border-left: 2px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    background: var(--light);
-    overflow-y: auto;
-}
-
-.comm-timeline-header {
-    padding: 20px 15px;
-    border-bottom: 1px solid var(--border);
-    background: white;
-    font-weight: 600;
-    text-align: center;
-}
-
-.comm-timeline-content {
-    padding: 15px;
-}
-
-.comm-timestamp {
-    font-size: 0.75em;
-    color: var(--text-light);
-    text-align: right;
-    padding: 5px 0;
-    font-family: monospace;
-}
-
-.comm-timestamp.date {
-    font-weight: 600;
-    color: var(--primary);
-    text-align: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 10px;
-}
-
-.comm-status {
-    padding: 10px 20px;
-    font-size: 0.85em;
-    color: var(--text-light);
-    text-align: center;
-    border-top: 1px solid var(--border);
-}
-
-.comm-save-indicator {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.85em;
-}
-
-.comm-save-indicator.saving {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.comm-save-indicator.saved {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.comm-previous-header {
-    padding: 15px 20px;
-    background: white;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.comm-previous-close {
-    background: none;
-    border: none;
-    font-size: 1.2em;
-    cursor: pointer;
-    color: var(--text-light);
-    padding: 5px 10px;
-}
-
-.comm-previous-close:hover {
-    color: var(--danger);
-}
-
-/* Communications Responsive */
-@media (max-width: 968px) {
-    .comm-container {
-        grid-template-columns: 1fr;
-        height: auto;
-    }
-    .comm-sidebar, .comm-timeline {
-        border: none;
-        border-bottom: 1px solid var(--border);
-    }
-    .comm-container.split-view {
-        grid-template-columns: 1fr;
-    }
-    .comm-previous {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-    }
-}
+window.CommunicationsTab = CommunicationsTab;
