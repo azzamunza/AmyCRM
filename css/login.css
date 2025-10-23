@@ -8,7 +8,7 @@
 .login-left {
     flex: 1;
     background: linear-gradient(135deg, rgba(37, 99, 235, 0.85) 0%, rgba(59, 130, 246, 0.75) 100%),
-                url('images/login.png');
+                url('../images/login.png');
     background-size: cover;
     background-position: center;
     display: flex;
