@@ -1,0 +1,2 @@
+Copilot access check: 2025-10-23T04:49:44Z
+If this file exists, Copilot has write access to the CoPilot branch.

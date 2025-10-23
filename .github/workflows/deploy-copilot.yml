@@ -1,0 +1,45 @@
+name: Deploy CoPilot via Pages actions
+
+on:
+  push:
+    branches: [ "CoPilot" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read        # allow checkout
+  pages: write          # required to deploy
+  id-token: write       # required for the deploy action
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CoPilot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prepare site artifact with CoPilot top-level
+        run: |
+          set -e
+          rm -rf site
+          mkdir -p site/CoPilot
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='gh-pages' \
+            --exclude='site' \
+            ./ site/CoPilot/
+          touch site/.nojekyll
+          ls -la site
+          echo "Prepared artifact: site/ (contains top-level CoPilot/ folder)"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./site
+
+      - name: Deploy Pages artifact
+        uses: actions/deploy-pages@v1
