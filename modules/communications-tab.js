@@ -1,4 +1,17 @@
-// communications-tab.js - Enhanced encrypted communication logger with new features
+// communications-tab.js - Communications tab with Quill RTE integration (using local self-contained Quill files)
+//
+// This file will:
+// - Load Quill from local files: /css/quill.snow.css and /js/quill.js
+// - Initialize Quill editor at #commEditor if available; otherwise fall back to the textarea #commNoteArea
+// - Provide consistent helpers getEditorContent() / setEditorContent() to read/write HTML
+// - Keep previous features: timestamps, calendar insertion, upload file references, icon insertion,
+//   auto-save queue, progressiveSave, processSaveQueue, saveAndClose, createNewNote, timeline extraction
+//
+// Notes:
+// - The code saves the communication content as HTML (from Quill). If your storage expects plain text,
+//   you can convert HTML -> text before saving or adapt CommunicationsStorage.saveCommunication accordingly.
+// - The local Quill files must exist at the paths: /css/quill.snow.css and /js/quill.js (you said you've added them).
+// - If you want to vendor Quill assets under different paths, update the cssPath / jsPath variables below.
 
 const CommunicationsTab = {
     contacts: [],
@@ -14,10 +27,13 @@ const CommunicationsTab = {
     isSaving: false,
     lastTimestamp: null,
     googleDriveLink: null,
+    editor: null,          // Quill instance when used
+    useRTE: false,         // true when Quill is initialized and used
+    iconData: [],
 
     async render() {
         const container = document.getElementById('communications');
-        
+
         container.innerHTML = `
             <div class="comm-container" id="commContainer">
                 <!-- Left Sidebar: Contact List & History -->
@@ -37,7 +53,6 @@ const CommunicationsTab = {
                         </div>
                     </div>
                     <div class="comm-history-list" id="historyList" style="display:none;">
-                        <!-- Previous communications header -->
                         <div style="padding: 15px; background: white; border-bottom: 1px solid var(--border);">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <strong id="selectedContactHeader">Contact Name</strong>
@@ -46,7 +61,6 @@ const CommunicationsTab = {
                                 </button>
                             </div>
                         </div>
-                        <!-- History items -->
                         <div id="historyItems" style="padding: 10px;"></div>
                     </div>
                 </div>
@@ -62,12 +76,7 @@ const CommunicationsTab = {
                             <strong id="prevSummary">Summary</strong>
                             <div style="font-size: 0.85em; color: var(--text-light); margin-top: 5px;" id="prevMeta">Date</div>
                         </div>
-                        <textarea 
-                            id="prevNoteArea" 
-                            class="comm-note-area" 
-                            readonly
-                            style="background: white;"
-                        ></textarea>
+                        <div id="prevNoteArea" class="comm-prev-render" style="background: white; padding: 12px; border-radius: 6px; min-height: 120px; overflow:auto;"></div>
                     </div>
                 </div>
 
@@ -88,13 +97,15 @@ const CommunicationsTab = {
                     </div>
                     
                     <div class="comm-editor-container">
+                        <!-- RTE container (Quill) -->
+                        <div id="commEditor" style="min-height:200px; background:white; border-radius:6px; padding:8px;"></div>
+
+                        <!-- Fallback textarea (hidden when Quill is used) -->
                         <textarea 
                             id="commNoteArea" 
                             class="comm-note-area" 
                             placeholder="Start typing your communication notes here...&#10;&#10;Press Enter to save current line and add timestamp if needed.&#10;Text auto-saves progressively."
-                            oninput="CommunicationsTab.handleNoteInput()"
-                            onkeydown="CommunicationsTab.handleKeyPress(event)"
-                            disabled
+                            style="display:none; width:100%; min-height:200px; padding:8px; box-sizing:border-box;"
                         ></textarea>
                     </div>
 
@@ -278,15 +289,28 @@ const CommunicationsTab = {
                 .calendar-event:hover {
                     background: #bfdbfe;
                 }
+
+                .comm-prev-render img {
+                    max-width: 100%;
+                    height: auto;
+                }
             </style>
         `;
 
+        // Initialize RTE and the tab
         await this.init();
     },
 
     async init() {
         console.log('Initializing Communications tab...');
-        
+
+        // Use local self-contained Quill assets
+        // Paths relative to the site root (adjust if different)
+        const cssPath = '/css/quill.snow.css';
+        const jsPath = '/js/quill.js';
+
+        await this._ensureRTE(cssPath, jsPath);
+
         if (!EncryptionService.isReady()) {
             document.getElementById('contactList').innerHTML = `
                 <div style="text-align: center; padding: 20px; color: var(--danger);">
@@ -300,11 +324,168 @@ const CommunicationsTab = {
         await this.loadUserSettings();
         this.displayContacts();
         this.updateTimeline();
-        this.loadIcons();
+        await this.loadIcons();
+
+        // If fallback textarea is used, wire events
+        if (!this.useRTE) {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) {
+                ta.style.display = 'block';
+                ta.addEventListener('input', () => {
+                    this.currentNote = ta.value;
+                    this.updateTimeline();
+                    this.queueAutoSave();
+                });
+                ta.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.saveLine();
+                    }
+                });
+            }
+        }
+    },
+
+    // Load local Quill css + js; fallback to textarea on failure
+    async _ensureRTE(cssUrl, jsUrl) {
+        // If Quill already present (global), initialize
+        if (window.Quill) {
+            this._initQuill();
+            return;
+        }
+
+        try {
+            await this._loadCss(cssUrl);
+            await this._loadScript(jsUrl);
+            if (window.Quill) {
+                this._initQuill();
+            } else {
+                console.warn('Quill script loaded but window.Quill is not defined; using textarea fallback.');
+                this._rteFallback();
+            }
+        } catch (err) {
+            console.warn('Failed to load local Quill resources, using textarea fallback.', err);
+            this._rteFallback();
+        }
+    },
+
+    _rteFallback() {
+        this.useRTE = false;
+        const editorDiv = document.getElementById('commEditor');
+        const ta = document.getElementById('commNoteArea');
+        if (editorDiv) editorDiv.style.display = 'none';
+        if (ta) ta.style.display = 'block';
+    },
+
+    _loadCss(url) {
+        return new Promise((resolve, reject) => {
+            // If already loaded, resolve
+            if ([...document.getElementsByTagName('link')].some(l => l.href && l.href.includes(url))) {
+                return resolve();
+            }
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = url;
+            link.onload = () => resolve();
+            link.onerror = () => reject(new Error('Failed to load css: ' + url));
+            document.head.appendChild(link);
+        });
+    },
+
+    _loadScript(url) {
+        return new Promise((resolve, reject) => {
+            // If a script with same src already exists, resolve
+            if ([...document.getElementsByTagName('script')].some(s => s.src && s.src.includes(url))) {
+                return resolve();
+            }
+            const s = document.createElement('script');
+            s.src = url;
+            s.defer = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('Failed to load script: ' + url));
+            document.body.appendChild(s);
+        });
+    },
+
+    _initQuill() {
+        try {
+            // Initialize Quill with a compact toolbar
+            this.editor = new Quill('#commEditor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ header: [1, 2, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        ['link', 'image'],
+                        ['clean']
+                    ]
+                }
+            });
+
+            // When Quill content changes, update state and queue save
+            this.editor.on('text-change', () => {
+                this.currentNote = this.getEditorContent();
+                this.updateTimeline();
+                this.queueAutoSave();
+            });
+
+            // Hide fallback textarea
+            const ta = document.getElementById('commNoteArea');
+            if (ta) ta.style.display = 'none';
+            const ed = document.getElementById('commEditor');
+            if (ed) ed.style.display = 'block';
+
+            this.useRTE = true;
+            console.log('Quill initialized (local build) for CommunicationsTab');
+        } catch (e) {
+            console.error('Failed to initialize Quill:', e);
+            this._rteFallback();
+        }
+    },
+
+    // Normalized getters/setters: HTML strings
+    getEditorContent() {
+        if (this.useRTE && this.editor) {
+            // Use innerHTML to preserve formatting and links
+            return this.editor.root.innerHTML || '';
+        } else {
+            const ta = document.getElementById('commNoteArea');
+            return ta ? (ta.value || '') : '';
+        }
+    },
+
+    setEditorContent(html) {
+        if (this.useRTE && this.editor) {
+            // Quill does not accept arbitrary innerHTML via setContents; use clipboard to paste HTML
+            try {
+                // Use dangerouslyPasteHTML or clipboard API if available
+                if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+                    this.editor.clipboard.dangerouslyPasteHTML(html || '');
+                } else {
+                    // fallback: set innerHTML directly (not recommended but works)
+                    this.editor.root.innerHTML = html || '';
+                }
+            } catch (e) {
+                // fallback
+                this.editor.root.innerHTML = html || '';
+            }
+        } else {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) ta.value = this._stripHtml(html || '');
+        }
+        this.currentNote = html || '';
+        this.updateTimeline();
+    },
+
+    _stripHtml(html) {
+        if (!html) return '';
+        const d = document.createElement('div');
+        d.innerHTML = html;
+        return d.textContent || d.innerText || '';
     },
 
     async loadUserSettings() {
-        // Load Google Drive link from user settings
         const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
         this.googleDriveLink = userSettings.googleDriveLink || null;
     },
@@ -379,12 +560,10 @@ const CommunicationsTab = {
 
         console.log('Selected contact:', this.selectedContact.name);
 
-        // Show history list with contact header
         document.getElementById('contactList').style.display = 'none';
         document.getElementById('historyList').style.display = 'block';
         document.getElementById('selectedContactHeader').textContent = this.selectedContact.name;
 
-        // Update UI
         this.displayContacts();
         document.getElementById('selectedContactInfo').innerHTML = `
             <h3 style="margin-bottom: 5px;">${this.selectedContact.name}</h3>
@@ -393,26 +572,36 @@ const CommunicationsTab = {
             </p>
         `;
 
-        // Show summary input
         const summaryInput = document.getElementById('commSummary');
         summaryInput.style.display = 'block';
         summaryInput.disabled = false;
 
-        // Enable note taking
-        const noteArea = document.getElementById('commNoteArea');
-        noteArea.disabled = false;
-        noteArea.value = '';
+        // Enable editor or textarea
+        if (this.useRTE && this.editor) {
+            try {
+                this.editor.enable(true);
+                this.setEditorContent(''); // clear current editing area
+                this.editor.focus();
+            } catch (e) {
+                console.warn('Error enabling editor', e);
+            }
+        } else {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) {
+                ta.disabled = false;
+                ta.value = '';
+                ta.focus();
+            }
+        }
+
         this.currentNote = '';
         this.lastTimestamp = null;
-        noteArea.focus();
 
-        // Enable all buttons
-        document.getElementById('btnInsertTimestamp').disabled = false;
-        document.getElementById('btnInsertDate').disabled = false;
-        document.getElementById('btnUploadFile').disabled = false;
-        document.getElementById('btnInsertMenu').disabled = false;
-        document.getElementById('btnClearNote').disabled = false;
-        document.getElementById('btnNewNote').disabled = false;
+        // Enable toolbar buttons
+        ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id=>{
+            const el = document.getElementById(id);
+            if (el) el.disabled = false;
+        });
 
         await this.loadContactCommunications();
     },
@@ -431,15 +620,18 @@ const CommunicationsTab = {
         `;
         
         document.getElementById('commSummary').style.display = 'none';
-        document.getElementById('commNoteArea').disabled = true;
-        document.getElementById('commNoteArea').value = '';
+        if (!this.useRTE) {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) { ta.disabled = true; ta.value = ''; }
+        } else if (this.editor) {
+            this.editor.disable();
+            this.setEditorContent('');
+        }
         
-        document.getElementById('btnInsertTimestamp').disabled = true;
-        document.getElementById('btnInsertDate').disabled = true;
-        document.getElementById('btnUploadFile').disabled = true;
-        document.getElementById('btnInsertMenu').disabled = true;
-        document.getElementById('btnClearNote').disabled = true;
-        document.getElementById('btnNewNote').disabled = true;
+        ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id=>{
+            const el = document.getElementById(id);
+            if (el) el.disabled = true;
+        });
         
         this.displayContacts();
         this.closePreviousView();
@@ -489,7 +681,13 @@ const CommunicationsTab = {
             
             document.getElementById('prevSummary').textContent = comm.summary || 'No summary';
             document.getElementById('prevMeta').textContent = `${formatDate(comm.createdAt)} by ${comm.author}`;
-            document.getElementById('prevNoteArea').value = comm.content;
+
+            const prev = document.getElementById('prevNoteArea');
+            // comm.content may be HTML — render it directly into prevNoteArea
+            if (prev) {
+                // sanitize if you have a sanitizer; here we trust content but recommend sanitizing
+                prev.innerHTML = comm.content || this._stripHtml(comm.content || '');
+            }
             
             console.log('Viewing communication:', comm.id);
         } catch (error) {
@@ -503,36 +701,27 @@ const CommunicationsTab = {
         this.viewingComm = null;
     },
 
+    // Input handling: Quill triggers text-change which calls these helpers via setEditorContent / getEditorContent
     handleNoteInput() {
-        this.currentNote = document.getElementById('commNoteArea').value;
+        this.currentNote = this.getEditorContent();
         this.updateTimeline();
         this.queueAutoSave();
     },
 
     handleKeyPress(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
-            // Save line on Enter
             this.saveLine();
         }
     },
 
     saveLine() {
-        const noteArea = document.getElementById('commNoteArea');
-        const cursorPos = noteArea.selectionStart;
-        const lines = noteArea.value.substring(0, cursorPos).split('\n');
-        const currentLineIndex = lines.length - 1;
-        
-        // Check if we need a new timestamp (more than 1 minute since last)
         const now = Date.now();
         if (!this.lastTimestamp || (now - this.lastTimestamp) > 60000) {
-            // Insert timestamp at beginning of new line
             setTimeout(() => {
                 this.insertTimestamp();
                 this.lastTimestamp = now;
             }, 10);
         }
-        
-        // Queue save
         this.queueAutoSave();
     },
 
@@ -547,13 +736,15 @@ const CommunicationsTab = {
     },
 
     async progressiveSave() {
-        if (!this.selectedContact || !this.currentNote.trim()) return;
+        if (!this.selectedContact) return;
+        const contentHtml = (this.getEditorContent() || '').toString().trim();
+        if (!contentHtml) return;
 
-        const summary = document.getElementById('commSummary').value.trim() || 'Draft note';
+        const summary = (document.getElementById('commSummary')?.value || '').trim() || 'Draft note';
         
         this.saveQueue.push({
             contactId: this.selectedContact.id,
-            content: this.currentNote,
+            content: contentHtml,
             summary: summary,
             timestamp: Date.now()
         });
@@ -567,11 +758,10 @@ const CommunicationsTab = {
         this.isSaving = true;
         const saveIndicator = document.getElementById('saveIndicator');
         
-        // Show saving status
         saveIndicator.innerHTML = '<span class="comm-save-indicator saving"><span class="comm-save-spinner"></span>Saving...</span>';
 
         try {
-            const saveData = this.saveQueue[this.saveQueue.length - 1]; // Get latest
+            const saveData = this.saveQueue[this.saveQueue.length - 1];
             
             await CommunicationsStorage.saveCommunication(
                 saveData.contactId,
@@ -586,15 +776,13 @@ const CommunicationsTab = {
                 saveIndicator.innerHTML = '';
             }, 2000);
 
-            this.saveQueue = []; // Clear queue after successful save
+            this.saveQueue = [];
             
         } catch (error) {
             console.error('Save error:', error);
             saveIndicator.innerHTML = '<span class="comm-save-indicator" style="background: #fee2e2; color: #991b1b;">✗ Save failed</span>';
         } finally {
             this.isSaving = false;
-            
-            // Process next in queue if any
             if (this.saveQueue.length > 0) {
                 setTimeout(() => this.processSaveQueue(), 1000);
             }
@@ -610,13 +798,12 @@ const CommunicationsTab = {
         btnSaveClose.disabled = true;
         saveIndicator.innerHTML = '<span class="comm-save-indicator"><span class="comm-save-spinner"></span>Preparing to save...</span>';
 
-        // Wait for any pending saves
         while (this.isSaving || this.saveQueue.length > 0) {
             await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        // Final save
-        if (this.currentNote.trim()) {
+        const contentHtml = (this.getEditorContent() || '').toString().trim();
+        if (contentHtml) {
             saveIndicator.innerHTML = '<span class="comm-save-indicator saving"><span class="comm-save-spinner"></span>Saving data...</span>';
             
             try {
@@ -642,35 +829,47 @@ const CommunicationsTab = {
     async createNewNote() {
         if (!this.selectedContact) return;
 
-        if (this.currentNote.trim()) {
+        if ((this.getEditorContent() || '').toString().trim()) {
             if (!confirm('Start a new note? Current unsaved changes will be saved first.')) {
                 return;
             }
             await this.saveAndClose();
         }
 
-        // Reset for new note
-        document.getElementById('commNoteArea').value = '';
+        if (this.useRTE && this.editor) {
+            this.setEditorContent('');
+            this.editor.focus();
+        } else {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) { ta.value = ''; ta.focus(); }
+        }
+
         document.getElementById('commSummary').value = '';
         this.currentNote = '';
         this.lastTimestamp = null;
         this.updateTimeline();
-        
-        document.getElementById('commNoteArea').focus();
     },
 
     insertTimestamp() {
-        const noteArea = document.getElementById('commNoteArea');
         const now = new Date();
         const timestamp = `[${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}] `;
-        
-        const cursorPos = noteArea.selectionStart;
-        const textBefore = noteArea.value.substring(0, cursorPos);
-        const textAfter = noteArea.value.substring(cursorPos);
-        
-        noteArea.value = textBefore + timestamp + textAfter;
-        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + timestamp.length;
-        noteArea.focus();
+
+        if (this.useRTE && this.editor) {
+            const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+            // Insert as plain text so it's easy to parse later for timeline
+            this.editor.insertText(range.index, timestamp, 'user');
+            this.editor.setSelection(range.index + timestamp.length);
+            this.editor.focus();
+        } else {
+            const noteArea = document.getElementById('commNoteArea');
+            const cursorPos = noteArea.selectionStart;
+            const textBefore = noteArea.value.substring(0, cursorPos);
+            const textAfter = noteArea.value.substring(cursorPos);
+            noteArea.value = textBefore + timestamp + textAfter;
+            noteArea.selectionStart = noteArea.selectionEnd = cursorPos + timestamp.length;
+            noteArea.focus();
+            this.currentNote = noteArea.value;
+        }
 
         this.handleNoteInput();
     },
@@ -684,11 +883,11 @@ const CommunicationsTab = {
 
     handleCalendarInsert(event) {
         event.preventDefault();
-        
+
         const dateTime = document.getElementById('calendarDateTime').value;
         const title = document.getElementById('calendarTitle').value;
         const notes = document.getElementById('calendarNotes').value;
-        
+
         const date = new Date(dateTime);
         const formatted = date.toLocaleString('en-US', {
             weekday: 'short',
@@ -698,19 +897,34 @@ const CommunicationsTab = {
             minute: '2-digit'
         });
 
-        // Create calendar event text with Google Calendar link
         const eventText = `\n📅 ${formatted} - ${title}\n`;
         const googleCalUrl = this.createGoogleCalendarUrl(dateTime, title, notes);
-        const linkText = `[Add to Google Calendar](${googleCalUrl})\n`;
-        
-        const noteArea = document.getElementById('commNoteArea');
-        const cursorPos = noteArea.selectionStart;
-        const textBefore = noteArea.value.substring(0, cursorPos);
-        const textAfter = noteArea.value.substring(cursorPos);
-        
-        noteArea.value = textBefore + eventText + linkText + textAfter;
-        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + eventText.length + linkText.length;
-        noteArea.focus();
+        const linkHtml = `<a href="${googleCalUrl}" target="_blank">Add to Google Calendar</a>\n`;
+
+        if (this.useRTE && this.editor) {
+            const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+            // Use dangerouslyPasteHTML for the link and formatted event
+            try {
+                const htmlSnippet = `${this._escapeHtml(eventText)}<br>${linkHtml}<br>`;
+                if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+                    this.editor.clipboard.dangerouslyPasteHTML(range.index, htmlSnippet);
+                } else {
+                    this.editor.insertText(range.index, eventText + ' Add to Google Calendar\n', 'user');
+                }
+            } catch (e) {
+                this.editor.insertText(range.index, eventText + ' Add to Google Calendar\n', 'user');
+            }
+            this.editor.focus();
+        } else {
+            const noteArea = document.getElementById('commNoteArea');
+            const cursorPos = noteArea.selectionStart;
+            const textBefore = noteArea.value.substring(0, cursorPos);
+            const textAfter = noteArea.value.substring(cursorPos);
+            noteArea.value = textBefore + eventText + this._stripHtml(linkHtml) + textAfter;
+            noteArea.selectionStart = noteArea.selectionEnd = cursorPos + eventText.length + this._stripHtml(linkHtml).length;
+            noteArea.focus();
+            this.currentNote = noteArea.value;
+        }
 
         this.closeCalendarModal();
         this.handleNoteInput();
@@ -719,10 +933,8 @@ const CommunicationsTab = {
     createGoogleCalendarUrl(dateTime, title, notes) {
         const date = new Date(dateTime);
         const startDate = date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        
-        // End time 1 hour later
         const endDate = new Date(date.getTime() + 3600000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        
+
         const params = new URLSearchParams({
             action: 'TEMPLATE',
             text: title,
@@ -731,7 +943,7 @@ const CommunicationsTab = {
             sf: 'true',
             output: 'xml'
         });
-        
+
         return `https://calendar.google.com/calendar/render?${params.toString()}`;
     },
 
@@ -748,7 +960,6 @@ const CommunicationsTab = {
             return;
         }
 
-        // Create file input
         const input = document.createElement('input');
         input.type = 'file';
         input.onchange = async (e) => {
@@ -756,25 +967,36 @@ const CommunicationsTab = {
             if (!file) return;
 
             const isShared = confirm(`Upload "${file.name}" to shared folder?\n\nClick OK for shared (all users), Cancel for private (you only)`);
-            
-            // In a real implementation, you would upload to Google Drive here
-            // For now, we'll just insert a reference to the file
-            const noteArea = document.getElementById('commNoteArea');
-            const cursorPos = noteArea.selectionStart;
-            const textBefore = noteArea.value.substring(0, cursorPos);
-            const textAfter = noteArea.value.substring(cursorPos);
-            
-            const fileRef = `\n📎 [${file.name}](${this.googleDriveLink}) ${isShared ? '(Shared)' : '(Private)'}\n`;
-            
-            noteArea.value = textBefore + fileRef + textAfter;
-            noteArea.selectionStart = noteArea.selectionEnd = cursorPos + fileRef.length;
-            noteArea.focus();
-            
+
+            const fileHtml = `\n📎 <a href="${this.googleDriveLink}" target="_blank">${this._escapeHtml(file.name)}</a> ${isShared ? '(Shared)' : '(Private)'}\n`;
+
+            if (this.useRTE && this.editor) {
+                const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+                try {
+                    if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+                        this.editor.clipboard.dangerouslyPasteHTML(range.index, fileHtml);
+                    } else {
+                        this.editor.insertText(range.index, `📎 ${file.name} (${isShared ? 'Shared' : 'Private'})`, 'user');
+                    }
+                } catch (e) {
+                    this.editor.insertText(range.index, `📎 ${file.name} (${isShared ? 'Shared' : 'Private'})`, 'user');
+                }
+                this.editor.focus();
+            } else {
+                const noteArea = document.getElementById('commNoteArea');
+                const cursorPos = noteArea.selectionStart;
+                const textBefore = noteArea.value.substring(0, cursorPos);
+                const textAfter = noteArea.value.substring(cursorPos);
+                noteArea.value = textBefore + this._stripHtml(fileHtml) + textAfter;
+                noteArea.selectionStart = noteArea.selectionEnd = cursorPos + this._stripHtml(fileHtml).length;
+                noteArea.focus();
+                this.currentNote = noteArea.value;
+            }
+
             this.handleNoteInput();
-            
             alert(`File reference added: ${file.name}\n\n⚠️ Note: Actual file upload to Google Drive requires additional implementation.`);
         };
-        
+
         input.click();
     },
 
@@ -804,7 +1026,6 @@ const CommunicationsTab = {
 
     async loadIcons() {
         try {
-            // Load icon data from GitHub
             const response = await fetch('icon-themes/Gradient/icon-data.json');
             if (!response.ok) throw new Error('Failed to load icons');
             
@@ -825,9 +1046,9 @@ const CommunicationsTab = {
             grid.innerHTML = '<p style="text-align: center; color: var(--text-light);">No icons available</p>';
         } else {
             grid.innerHTML = this.iconData.map(icon => `
-                <div class="icon-item" onclick="CommunicationsTab.insertIcon('${icon.filename}', '${icon.label}')">
-                    <img src="icon-themes/Gradient/${icon.filename}" alt="${icon.label}">
-                    <span>${icon.label}</span>
+                <div class="icon-item" onclick="CommunicationsTab.insertIcon('${this._escapeJs(icon.filename)}', '${this._escapeJs(icon.label)}')">
+                    <img src="icon-themes/Gradient/${this._escapeJs(icon.filename)}" alt="${this._escapeHtml(icon.label)}">
+                    <span>${this._escapeHtml(icon.label)}</span>
                 </div>
             `).join('');
         }
@@ -836,18 +1057,31 @@ const CommunicationsTab = {
     },
 
     insertIcon(filename, label) {
-        const noteArea = document.getElementById('commNoteArea');
-        const cursorPos = noteArea.selectionStart;
-        const textBefore = noteArea.value.substring(0, cursorPos);
-        const textAfter = noteArea.value.substring(cursorPos);
-        
-        // Insert as markdown image
-        const iconRef = `![${label}](icon-themes/Gradient/${filename}) `;
-        
-        noteArea.value = textBefore + iconRef + textAfter;
-        noteArea.selectionStart = noteArea.selectionEnd = cursorPos + iconRef.length;
-        noteArea.focus();
-        
+        // Insert as <img> tag for RTE, or markdown-like text for textarea fallback
+        const imgHtml = `<img src="icon-themes/Gradient/${this._escapeHtml(filename)}" alt="${this._escapeHtml(label)}" style="max-width:48px; max-height:48px;"> `;
+        if (this.useRTE && this.editor) {
+            const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+            try {
+                if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+                    this.editor.clipboard.dangerouslyPasteHTML(range.index, imgHtml);
+                } else {
+                    this.editor.insertText(range.index, `[${label}]`, 'user');
+                }
+            } catch (e) {
+                this.editor.insertText(range.index, `[${label}]`, 'user');
+            }
+            this.editor.focus();
+        } else {
+            const noteArea = document.getElementById('commNoteArea');
+            const cursorPos = noteArea.selectionStart;
+            const textBefore = noteArea.value.substring(0, cursorPos);
+            const textAfter = noteArea.value.substring(cursorPos);
+            noteArea.value = textBefore + `![${label}](icon-themes/Gradient/${filename}) ` + textAfter;
+            noteArea.selectionStart = noteArea.selectionEnd = cursorPos + (`![${label}](icon-themes/Gradient/${filename}) `).length;
+            noteArea.focus();
+            this.currentNote = noteArea.value;
+        }
+
         this.closeInsertMenu();
         this.handleNoteInput();
     },
@@ -859,26 +1093,23 @@ const CommunicationsTab = {
     updateTimeline() {
         const now = new Date();
         const timelineEl = document.getElementById('timelineContent');
-        
+
         const currentDate = now.toLocaleDateString('en-US', { 
             weekday: 'short', 
             month: 'short', 
             day: 'numeric' 
         });
-        
+
         const currentTime = now.toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit',
             hour12: false
         });
 
-        // Extract timestamps from note
-        const noteArea = document.getElementById('commNoteArea');
-        if (!noteArea) return;
-        
-        const lines = noteArea.value.split('\n');
+        const content = this.getEditorContent();
+        const lines = this._stripHtml(content).split('\n');
         const timestamps = [];
-        
+
         lines.forEach((line, index) => {
             const match = line.match(/\[(\d{2}:\d{2})\]/);
             if (match) {
@@ -890,7 +1121,7 @@ const CommunicationsTab = {
         });
 
         let timelineHTML = `<div class="comm-timestamp date">${currentDate}</div>`;
-        
+
         if (timestamps.length > 0) {
             timelineHTML += timestamps.map(ts => 
                 `<div class="comm-timestamp">${ts.time} (Line ${ts.line})</div>`
@@ -907,12 +1138,34 @@ const CommunicationsTab = {
             return;
         }
 
-        document.getElementById('commNoteArea').value = '';
+        if (this.useRTE && this.editor) {
+            this.setEditorContent('');
+        } else {
+            const ta = document.getElementById('commNoteArea');
+            if (ta) ta.value = '';
+        }
+
         document.getElementById('commSummary').value = '';
         this.currentNote = '';
         this.lastTimestamp = null;
         this.updateTimeline();
         document.getElementById('statusText').textContent = 'Notes cleared';
+    },
+
+    // Utilities
+    _escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    },
+
+    _escapeJs(str) {
+        if (!str) return '';
+        return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
     }
 };
 
