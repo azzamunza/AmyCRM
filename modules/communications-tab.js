@@ -306,7 +306,7 @@ const CommunicationsTab = {
 
         // Use local self-contained Quill assets
         // Paths relative to the site root (adjust if different)
-        const cssPath = '/css/quill.snow.css';
+        const cssPath = '/css/quill.css';
         const jsPath = '/js/quill.js';
 
         await this._ensureRTE(cssPath, jsPath);
