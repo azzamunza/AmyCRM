@@ -2,7 +2,12 @@ name: Deploy CoPilot branch to gh-pages (CoPilot)
 
 on:
   push:
-    branches: [ "CoPilot" ]
+    branches: ["CoPilot"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
@@ -12,8 +17,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: true   # allow using the GITHUB_TOKEN for pushes
 
-      # Optional build step if you have a build process:
+      # Optional build steps go here
       # - name: Setup Node
       #   uses: actions/setup-node@v4
       #   with:
