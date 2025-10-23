@@ -186,6 +186,155 @@ const CommunicationsStorage = {
     },
 
     /**
+     * Save or update a note session by sessionKey.
+     * If sessionKey is provided and file exists, this overwrites the existing note file.
+     * If sessionKey is null, a sessionKey will be generated and returned in response.
+     *
+     * @param {number} contactId
+     * @param {string|null} sessionKey - persistent identifier string (e.g. note-session-123)
+     * @param {string} content - editor content (Markdown or HTML as decided by client)
+     * @param {string} summary
+     * @returns {Promise<Object>} - { sessionKey, savedAt }
+     */
+    async saveNoteSession(contactId, sessionKey, content, summary = '') {
+        try {
+            // Create or reuse sessionKey. If none provided, create one (but client should reuse it).
+            if (!sessionKey) {
+                sessionKey = `note-${Date.now()}-${Math.random().toString(36).substr(2,6)}`;
+            }
+            const notePath = `${this.config.basePath}/contact-${contactId}/notes/${sessionKey}.json`;
+
+            // Build note record
+            const note = {
+                id: sessionKey,
+                contactId: contactId,
+                summary: summary,
+                content: content,
+                author: window.currentUser?.email || 'unknown',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            // Encrypt and encode
+            const encrypted = await EncryptionService.encryptObject(note);
+            const encoded = btoa(encrypted);
+
+            // Use PUT to create or update the same path (overwrite behavior)
+            const payload = {
+                message: `Save note session ${sessionKey} for contact ${contactId}`,
+                content: encoded
+            };
+
+            // If file exists we must include its sha for the GitHub API - attempt to fetch sha first
+            try {
+                const getResp = await fetch(
+                    `https://api.github.com/repos/${this.config.CONFIG.GITHUB_USERNAME}/${this.config.CONFIG.GITHUB_REPO}/contents/${notePath}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${this.config.CONFIG.GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+                if (getResp.ok) {
+                    const existing = await getResp.json();
+                    if (existing.sha) payload.sha = existing.sha;
+                }
+            } catch (e) {
+                // file not found -> will create new
+            }
+
+            const response = await fetch(
+                `https://api.github.com/repos/${this.config.CONFIG.GITHUB_USERNAME}/${this.config.CONFIG.GITHUB_REPO}/contents/${notePath}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${this.config.CONFIG.GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(`Failed to save note session: ${error.message || response.status}`);
+            }
+
+            const result = await response.json();
+
+            // Update manifest to reference this note file (if not already present)
+            const manifest = await this.getManifest(contactId);
+            const exists = manifest.communications.find(c => c.filePath === notePath);
+            if (!exists) {
+                manifest.communications.push({
+                    id: sessionKey,
+                    summary: summary,
+                    timestamp: note.createdAt,
+                    author: note.author,
+                    filePath: notePath,
+                    hasAttachments: false,
+                    isNote: true
+                });
+                await this.saveManifest(manifest);
+            }
+
+            return { sessionKey: sessionKey, savedAt: new Date().toISOString() };
+        } catch (error) {
+            console.error('Error saving note session:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Load a note session by sessionKey
+     * @param {number} contactId
+     * @param {string} sessionKey
+     * @returns {Promise<Object>} - note object
+     */
+    async loadNoteSession(contactId, sessionKey) {
+        const notePath = `${this.config.basePath}/contact-${contactId}/notes/${sessionKey}.json`;
+        try {
+            const response = await fetch(
+                `https://api.github.com/repos/${this.config.CONFIG.GITHUB_USERNAME}/${this.config.CONFIG.GITHUB_REPO}/contents/${notePath}`,
+                {
+                    headers: {
+                        'Authorization': `token ${this.config.CONFIG.GITHUB_TOKEN}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                }
+            );
+            if (!response.ok) {
+                throw new Error(`Failed to load note session: ${response.status}`);
+            }
+            const data = await response.json();
+            const encryptedContent = atob(data.content);
+            const note = await EncryptionService.decryptObject(encryptedContent);
+            note._sha = data.sha;
+            return note;
+        } catch (error) {
+            console.error('Error loading note session:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * List note sessions for a contact (scans manifest for isNote flags)
+     * @param {number} contactId
+     * @returns {Promise<Array>}
+     */
+    async listNoteSessions(contactId) {
+        try {
+            const manifest = await this.getManifest(contactId);
+            return manifest.communications.filter(c => c.isNote === true).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp));
+        } catch (error) {
+            console.error('Error listing note sessions:', error);
+            return [];
+        }
+    },
+
+    /**
      * Load a communication
      * @param {number} contactId - Contact ID
      * @param {string} commId - Communication ID
