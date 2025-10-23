@@ -1,4 +1,10 @@
-name: Deploy CoPilot branch to gh-pages (CoPilot)
+# Deploy CoPilot branch to GitHub Pages using the official Pages actions.
+# This workflow builds an artifact whose top-level contains a `CoPilot/` folder,
+# so after deployment your site will be available at:
+#   https://azzamunza.github.io/AmyCRM/CoPilot/
+#
+# Trigger: push to CoPilot or manual workflow_dispatch
+name: Deploy CoPilot via Pages actions
 
 on:
   push:
@@ -6,9 +12,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read        # allow checkout
+  pages: write          # required to deploy
+  id-token: write       # required for the deploy action
 
 jobs:
   deploy:
@@ -20,15 +26,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Ensure .nojekyll so Pages will serve files starting with _
-        run: echo > .nojekyll
+      - name: Prepare site artifact with CoPilot top-level
+        run: |
+          set -e
+          # Remove any previous working dir
+          rm -rf site
+          mkdir -p site/CoPilot
+          # Copy repository contents into site/CoPilot, excluding workflow files and build artifacts
+          # Adjust excludes if you need to include/exclude more files
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='gh-pages' \
+            --exclude='site' \
+            ./ site/CoPilot/
+          # Ensure .nojekyll at site root so GitHub Pages doesn't run Jekyll
+          touch site/.nojekyll
+          ls -la site
+          echo "Prepared artifact: site/ (contains top-level CoPilot/ folder)"
 
-      - name: Deploy to gh-pages under /CoPilot
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: .
-          destination_dir: CoPilot
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
+          path: ./site
+
+      - name: Deploy Pages artifact
+        uses: actions/deploy-pages@v1
