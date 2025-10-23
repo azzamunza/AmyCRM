@@ -54,7 +54,7 @@ jobs:
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
-          cp quill.snow.css _site/css/
+          cp quill.css _site/css/
           cp quill.js _site/js/
           cp modules/*.js _site/modules/
           cp note-editor.js _site/js/
