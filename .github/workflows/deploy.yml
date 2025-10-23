@@ -39,6 +39,8 @@ jobs:
         run: |
           mkdir -p _site
           mkdir -p _site/modules
+          mkdir -p _site/css
+          mkdir -p _site/js
           
           cp index.html _site/
           cp dashboard.html _site/
@@ -52,7 +54,11 @@ jobs:
           cp shared.css _site/
           cp login.css _site/
           cp dashboard.css _site/
-          cp modules/*.js _site/modules/        
+          cp quill.snow.css _site/css/
+          cp quill.js _site/js/
+          cp modules/*.js _site/modules/
+          cp note-editor.js _site/js/
+          cp rte.js _site/js/
           
           if [ -d "images" ]; then
             mkdir -p _site/images
