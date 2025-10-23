@@ -1,9 +1,3 @@
-# Deploy CoPilot branch to GitHub Pages using the official Pages actions.
-# This workflow builds an artifact whose top-level contains a `CoPilot/` folder,
-# so after deployment your site will be available at:
-#   https://azzamunza.github.io/AmyCRM/CoPilot/
-#
-# Trigger: push to CoPilot or manual workflow_dispatch
 name: Deploy CoPilot via Pages actions
 
 on:
@@ -29,11 +23,8 @@ jobs:
       - name: Prepare site artifact with CoPilot top-level
         run: |
           set -e
-          # Remove any previous working dir
           rm -rf site
           mkdir -p site/CoPilot
-          # Copy repository contents into site/CoPilot, excluding workflow files and build artifacts
-          # Adjust excludes if you need to include/exclude more files
           rsync -a --delete \
             --exclude='.git' \
             --exclude='.github' \
@@ -41,13 +32,12 @@ jobs:
             --exclude='gh-pages' \
             --exclude='site' \
             ./ site/CoPilot/
-          # Ensure .nojekyll at site root so GitHub Pages doesn't run Jekyll
           touch site/.nojekyll
           ls -la site
           echo "Prepared artifact: site/ (contains top-level CoPilot/ folder)"
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: ./site
 
