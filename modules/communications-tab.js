@@ -320,7 +320,105 @@ const CommunicationsTab = {
        - When listing communications, show Delete button only if window.currentUser && window.currentUser.isAdmin
        - When showing contact profile call _renderDeletedNotesSection() if admin
     */
-
+      // RTE loader / initializer helpers — add these inside the CommunicationsTab object
+    
+      async _ensureRTE(cssUrl, jsUrl) {
+        // If Quill already present, initialize immediately
+        if (window.Quill) {
+          this._initQuill();
+          return;
+        }
+    
+        try {
+          await this._loadCss(cssUrl);
+          await this._loadScript(jsUrl);
+    
+          if (window.Quill) {
+            this._initQuill();
+          } else {
+            console.warn('Quill loaded but window.Quill is not available — using textarea fallback.');
+            this._rteFallback();
+          }
+        } catch (err) {
+          console.warn('Failed to load Quill assets, falling back to textarea.', err);
+          this._rteFallback();
+        }
+      },
+    
+      _rteFallback() {
+        this.useRTE = false;
+        const editorDiv = document.getElementById('commEditor');
+        const ta = document.getElementById('commNoteArea');
+        if (editorDiv) editorDiv.style.display = 'none';
+        if (ta) ta.style.display = 'block';
+      },
+    
+      _loadCss(url) {
+        return new Promise((resolve, reject) => {
+          // avoid loading twice
+          if ([...document.getElementsByTagName('link')].some(l => l.href && l.href.includes(url))) {
+            return resolve();
+          }
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = url;
+          link.onload = () => resolve();
+          link.onerror = () => reject(new Error('Failed to load css: ' + url));
+          document.head.appendChild(link);
+        });
+      },
+    
+      _loadScript(url) {
+        return new Promise((resolve, reject) => {
+          // avoid loading twice
+          if ([...document.getElementsByTagName('script')].some(s => s.src && s.src.includes(url))) {
+            return resolve();
+          }
+          const s = document.createElement('script');
+          s.src = url;
+          s.defer = true;
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('Failed to load script: ' + url));
+          document.body.appendChild(s);
+        });
+      },
+    
+      _initQuill() {
+        try {
+          // initialize Quill into #commEditor (uses local, self-contained Quill build)
+          this.editor = new Quill('#commEditor', {
+            theme: 'snow',
+            modules: {
+              toolbar: [
+                [{ header: [1, 2, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ list: 'ordered' }, { list: 'bullet' }],
+                ['link', 'image'],
+                ['clean']
+              ]
+            }
+          });
+    
+          // on text change keep currentNote and update timeline; autosave handled elsewhere
+          this.editor.on('text-change', () => {
+            this.currentNote = this.getEditorContent();
+            this.updateTimeline();
+            // do not call network save here on every keystroke; Enter and autosave logic handle persistence
+          });
+    
+          // hide fallback textarea (if present) and show editor
+          const ta = document.getElementById('commNoteArea');
+          if (ta) ta.style.display = 'none';
+          const ed = document.getElementById('commEditor');
+          if (ed) ed.style.display = 'block';
+    
+          this.useRTE = true;
+        } catch (err) {
+          console.error('Failed to initialize Quill:', err);
+          this._rteFallback();
+        }
+      },
+    
     // (For brevity in this message I omitted re-listing every unchanged function body. The important code paths above implement the requested features.)
 };
 
