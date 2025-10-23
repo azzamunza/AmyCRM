@@ -53,13 +53,16 @@
     <script src="encryption-kms.js"></script>
     <script src="encryption.js"></script>
     
-    <!-- Module Scripts -->
+    <!-- Module Scripts: NOTE the order — communications-storage must load BEFORE the communications module -->
     <script src="modules/dashboard-tab.js"></script>
     <script src="modules/contacts-tab.js"></script>
     <script src="modules/admin-tab.js"></script>
     <script src="modules/settings-tab.js"></script>
-    <script src="modules/communications-tab.js"></script>
+
+    <!-- communications-storage.js must be available before modules/communications-tab.js -->
     <script src="communications-storage.js"></script>
+
+    <script src="modules/communications-tab.js"></script>
     <script src="modules/documents-tab.js"></script>
     <script src="modules/incidents-tab.js"></script>
     
@@ -137,7 +140,7 @@
                     tab.classList.add('active');
                 }
             });
-
+    
             // Render the tab module
             const moduleName = tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Tab';
             if (window[moduleName] && typeof window[moduleName].render === 'function') {
@@ -163,162 +166,6 @@
             }).join('');
 
             statusEl.innerHTML = html;
-        }
-
-        async function loadAdminPanel() {
-            if (!requireAdmin(currentUser)) return;
-
-            try {
-                const users = await fetchUsers();
-                const tbody = document.getElementById('userManagementList');
-
-                if (users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light);">No users found</td></tr>';
-                    return;
-                }
-
-                tbody.innerHTML = users.map(user => `
-                    <tr>
-                        <td>${user.name}</td>
-                        <td>${user.email}</td>
-                        <td>${user.phone || '-'}</td>
-                        <td>
-                            <span class="badge badge-${user.status === 'approved' ? 'user' : 'pending'}">
-                                ${user.status}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge badge-${user.role === 'admin' ? 'admin' : 'user'}">
-                                ${user.role}
-                            </span>
-                        </td>
-                        <td>
-                            ${user.status === 'pending' ? `
-                                <button class="btn-sm btn-success" onclick="approveUser(${user.id})">Approve</button>
-                                <button class="btn-sm btn-danger" onclick="denyUser(${user.id})">Deny</button>
-                            ` : `
-                                ${user.email !== 'azzamunza@gmail.com' && user.email !== 'amp41286@gmail.com' ? `
-                                    <button class="btn-sm btn-danger" onclick="deleteUser(${user.id})">Delete</button>
-                                    ${user.role === 'user' ? `
-                                        <button class="btn-sm btn-primary" onclick="makeAdmin(${user.id})">Make Admin</button>
-                                    ` : ''}
-                                ` : '<span style="color: var(--text-light);">Protected</span>'}
-                            `}
-                        </td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error loading admin panel:', error);
-                document.getElementById('userManagementList').innerHTML = 
-                    `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--danger);">Error loading users: ${error.message}</td></tr>`;
-            }
-        }
-
-        async function approveUser(userId) {
-            if (!requireAdmin(currentUser)) return;
-
-            try {
-                const users = await fetchUsers();
-                const user = users.find(u => u.id === userId);
-                
-                if (user) {
-                    user.status = 'approved';
-                    await saveUsers(users);
-                    await loadAdminPanel();
-                    alert(`User ${user.name} has been approved!`);
-                }
-            } catch (error) {
-                alert('Error approving user: ' + error.message);
-            }
-        }
-
-        async function denyUser(userId) {
-            if (!requireAdmin(currentUser)) return;
-            if (!confirm('Are you sure you want to deny this user?')) return;
-            
-            try {
-                const users = await fetchUsers();
-                const filteredUsers = users.filter(u => u.id !== userId);
-                await saveUsers(filteredUsers);
-                await loadAdminPanel();
-                alert('User request denied');
-            } catch (error) {
-                alert('Error denying user: ' + error.message);
-            }
-        }
-
-        async function deleteUser(userId) {
-            if (!requireAdmin(currentUser)) return;
-            if (!confirm('Are you sure you want to delete this user?')) return;
-            
-            try {
-                const users = await fetchUsers();
-                const filteredUsers = users.filter(u => u.id !== userId);
-                await saveUsers(filteredUsers);
-                await loadAdminPanel();
-                alert('User deleted');
-            } catch (error) {
-                alert('Error deleting user: ' + error.message);
-            }
-        }
-
-        async function makeAdmin(userId) {
-            if (!requireAdmin(currentUser)) return;
-            if (!confirm('Are you sure you want to make this user an administrator?')) return;
-            
-            try {
-                const users = await fetchUsers();
-                const user = users.find(u => u.id === userId);
-                
-                if (user) {
-                    user.role = 'admin';
-                    await saveUsers(users);
-                    await loadAdminPanel();
-                    alert(`${user.name} is now an administrator!`);
-                }
-            } catch (error) {
-                alert('Error updating user role: ' + error.message);
-            }
-        }
-
-        async function loadCRMData() {
-            if (!CONFIG.GITHUB_TOKEN) {
-                document.getElementById('syncStatus').innerHTML = '<span style="color: var(--danger);">✗ GitHub token not configured</span>';
-                return;
-            }
-
-            try {
-                const response = await fetch(
-                    `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.DATA_FILE}`,
-                    {
-                        headers: {
-                            'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    }
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const content = atob(data.content);
-                    const crmData = JSON.parse(content);
-                    
-                    document.getElementById('totalContacts').textContent = crmData.contacts?.length || 0;
-                    document.getElementById('totalCommunications').textContent = crmData.communications?.length || 0;
-                    document.getElementById('totalDocuments').textContent = crmData.documents?.length || 0;
-                    document.getElementById('totalIncidents').textContent = crmData.incidents?.length || 0;
-                    
-                    document.getElementById('syncStatus').innerHTML = '<span style="color: var(--success);">✓ Connected to GitHub</span>';
-                } else if (response.status === 404) {
-                    document.getElementById('syncStatus').innerHTML = '<span style="color: var(--warning);">⚠ No data file found. Data will be created on first save.</span>';
-                } else {
-                    document.getElementById('syncStatus').innerHTML = '<span style="color: var(--danger);">✗ Error connecting to GitHub</span>';
-                }
-            } catch (error) {
-                console.error('Error loading CRM data:', error);
-                document.getElementById('syncStatus').innerHTML = '<span style="color: var(--danger);">✗ Error loading data</span>';
-            }
         }
     </script>
 </body>
