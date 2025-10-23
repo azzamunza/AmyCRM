@@ -16,6 +16,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Create config.js
         run: |
           cat > config.js << 'EOF'
@@ -29,46 +30,75 @@ jobs:
             DATA_FILE: 'crm-data.json'
           };
           EOF
-          
           echo "✓ Config created successfully"
           echo "Contents:"
           cat config.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Build site
         run: |
+          # exit on errors except where explicitly allowed (we guard the optional copies)
+          set -e
+          # allow globbing to expand to empty (prevents literal pattern on no matches)
+          shopt -s nullglob
+
+          # create directories
           mkdir -p _site
           mkdir -p _site/modules
           mkdir -p _site/css
           mkdir -p _site/js
-          
+          mkdir -p _site/icon-themes/Gradient
+
+          # copy top-level app files (fail if missing since they should exist)
           cp index.html _site/
           cp dashboard.html _site/
           cp config.js _site/
           cp auth.js _site/
           cp crm.js _site/
-          cp encryption-local.js _site/
-          cp encryption-kms.js _site/
-          cp encryption.js _site/
-          cp communications-storage.js _site/
-          cp shared.css _site/
-          cp login.css _site/
-          cp dashboard.css _site/
-          cp css/*.css _site/css/
-          cp js/*.js _site/js/
-          cp modules/*.js _site/modules/
-          
+          cp encryption-local.js _site/ || true
+          cp encryption-kms.js _site/ || true
+          cp encryption.js _site/ || true
+          cp communications-storage.js _site/ || true
+
+          # css/js assets (optional copies guarded)
+          cp css/*.css _site/css/ || echo "No CSS files matched in css/"
+          cp js/*.js _site/js/ || echo "No JS files matched in js/"
+
+          # optional specific files (guarded)
+          [ -f js/note-editor.js ] && cp js/note-editor.js _site/js/ || echo "note-editor.js not found, skipping"
+          [ -f js/rte.js ] && cp js/rte.js _site/js/ || echo "rte.js not found, skipping"
+
+          # copy modules (optional)
+          cp modules/*.js _site/modules/ || echo "No modules found"
+
+          # copy icon-themes directory recursively (this preserves subdirectories like Gradient/)
+          if [ -d "icon-themes" ]; then
+            cp -r icon-themes _site/
+          else
+            echo "icon-themes directory not found, skipping"
+          fi
+
+          # images (optional)
           if [ -d "images" ]; then
             mkdir -p _site/images
             cp -r images/* _site/images/
           fi
-          
-          echo "Built site contents:"
-          ls -la _site/
-          echo "Modules:"
-          ls -la _site/modules/ 2>/dev/null || echo "No modules found"
+
+          echo "Built site contents (top-level):"
+          ls -la _site/ || true
+          echo "Site CSS:"
+          ls -la _site/css/ || true
+          echo "Site JS:"
+          ls -la _site/js/ || true
+          echo "Icon themes:"
+          ls -la _site/icon-themes/ 2>/dev/null || echo "No icon-themes copied"
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        # use v2 to avoid deprecated upload-artifact:v3 transitive dependency
+        uses: actions/upload-pages-artifact@v2
+
   deploy:
     environment:
       name: github-pages
