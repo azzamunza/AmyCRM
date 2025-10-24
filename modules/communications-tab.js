@@ -51,57 +51,66 @@ const CommunicationsTab = {
 
         <!-- Right: editor + timeline (top-row toolbar+timeline header, bottom-row editor+timeline) -->
         <main class="comm-right" style="flex:1 1 auto;">
-          <div id="commGrid" class="comm-grid" style="display:grid; grid-template-columns: 1fr 180px; grid-template-rows: auto 1fr; gap:0; align-items:start;">
-            <!-- Top-left: toolbar -->
-            <div style="grid-column:1 / 2; grid-row:1 / 2; padding:6px;">
-              <div id="quill-toolbar" class="ql-toolbar ql-snow">
-                <span class="ql-formats">
-                  <select class="ql-header"><option value="1"></option><option value="2"></option><option value="3"></option><option selected></option></select>
-                  <button class="ql-bold"></button>
-                  <button class="ql-italic"></button>
-                  <button class="ql-underline"></button>
-                  <button class="ql-strike"></button>
-                </span>
-                <span class="ql-formats">
-                  <button class="ql-list" value="ordered"></button>
-                  <button class="ql-list" value="bullet"></button>
-                </span>
-                <span class="ql-formats">
-                  <select class="ql-color"></select>
-                  <select class="ql-background"></select>
-                </span>
-                <span class="ql-formats">
-                  <button class="ql-link"></button>
-                  <button class="ql-image"></button>
-                </span>
+           Top-left (toolbar), Top-right (timeline header),
+   Bottom-left (editor), Bottom-right (timeline content)
+*/
 
-                <!-- custom buttons: use non-ql classes to avoid Quill attempting to attach formats -->
-                <span class="ql-formats">
-                  <button class="btn-insert-emoji" title="Insert emoji">😀</button>
-                  <button class="btn-insert-calendar" title="Insert calendar">📅</button>
-                  <button class="btn-insert-file" title="Insert file">📎</button>
-                  <button class="btn-insert-table" title="Insert table">🔳</button>
-                  <button class="btn-save" title="Save">💾</button>
-                </span>
-              </div>
-            </div>
+<div id="commGrid" class="comm-grid">
+  <!-- Top-left: toolbar -->
+  <div class="grid-toolbar">
+    <div id="quill-toolbar" class="ql-toolbar ql-snow">
+      <span class="ql-formats">
+        <select class="ql-header">
+          <option value="1"></option>
+          <option value="2"></option>
+          <option value="3"></option>
+          <option selected></option>
+        </select>
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+        <button class="ql-strike"></button>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+      </span>
+      <span class="ql-formats">
+        <select class="ql-color"></select>
+        <select class="ql-background"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-link"></button>
+        <button class="ql-image"></button>
+      </span>
 
-            <!-- Top-right: timeline header -->
-            <div style="grid-column:2 / 3; grid-row:1 / 2; display:flex; align-items:center; padding:6px 8px;">
-              <div class="comm-timeline-header" style="font-weight:600;">Timeline</div>
-            </div>
+      <!-- custom buttons (non-ql classes) -->
+      <span class="ql-formats">
+        <button class="btn-insert-emoji" title="Insert emoji">😀</button>
+        <button class="btn-insert-calendar" title="Insert calendar">📅</button>
+        <button class="btn-insert-file" title="Insert file">📎</button>
+        <button class="btn-insert-table" title="Insert table">🔳</button>
+        <button class="btn-save" title="Save">💾</button>
+      </span>
+    </div>
+  </div>
 
-            <!-- Bottom-left: editor -->
-            <div style="grid-column:1 / 2; grid-row:2 / 3; padding:0;">
-              <div id="commEditor" style="min-height:260px; border:1px solid var(--border); border-radius:0 0 6px 6px; overflow:hidden;"></div>
-              <textarea id="commNoteArea" style="display:none; width:100%; min-height:260px; padding:8px; box-sizing:border-box;"></textarea>
-            </div>
+  <!-- Top-right: timeline header (centered, bordered white box) -->
+  <div class="grid-timeline-header" style="grid-column:2 / 3; grid-row:1 / 2; display:flex; justify-content:center; align-items:center; align-self:stretch; background:#ffffff; border:1px solid var(--border);">
+    <div class="comm-timeline-header" style="font-weight:600;">Timeline</div>
+  </div>
 
-            <!-- Bottom-right: timeline content (timestamps) -->
-            <div style="grid-column:2 / 3; grid-row:2 / 3; padding:8px;">
-              <div id="timelineContent" class="comm-timeline-content" style="background:white; border:1px solid var(--border); border-radius:6px; min-height:260px; overflow:auto; padding:8px;"></div>
-            </div>
-          </div>
+  <!-- Bottom-left: editor -->
+  <div class="grid-editor" style="grid-column:1 / 2; grid-row:2 / 3;">
+    <div id="commEditor" class="comm-editor-container" style="min-height:260px;"></div>
+    <textarea id="commNoteArea" style="display:none;"></textarea>
+  </div>
+
+  <!-- Bottom-right: timeline content -->
+  <div class="grid-timeline" style="grid-column:2 / 3; grid-row:2 / 3;">
+    <div id="timelineContent" class="comm-timeline-content" style="background:white; border:1px solid var(--border); border-radius:6px; min-height:260px; overflow:auto; padding:8px;"></div>
+  </div>
+</div>
 
           <div id="statusArea" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
             <div id="saveIndicator"></div>
