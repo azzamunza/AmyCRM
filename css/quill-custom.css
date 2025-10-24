@@ -3,7 +3,7 @@
 
 /* ---- Toolbar (Snow theme) ---- */
 #quill-toolbar.ql-toolbar {
-  background: #fff;
+  background: #e3e3e3; /* changed per request */
   border-bottom: 1px solid rgba(0,0,0,0.08);
   padding: 6px;
   border-radius: 6px 6px 0 0;
@@ -32,7 +32,13 @@
   grid-row: 1 / 2;
   display: flex;
   align-items: center;
+  justify-content: center;
+  align-self: center;
   padding-left: 8px;
+  background: #ffffff; /* white box as requested */
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  height: 100%;
 }
 
 .comm-grid .grid-editor {
@@ -80,6 +86,8 @@
   padding: 6px;
   background: white;
   box-sizing: border-box;
+  min-height: 260px;
+  overflow: auto;
 }
 
 .comm-timeline-content .comm-timestamp {
