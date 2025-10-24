@@ -1,5 +1,8 @@
-// modules/communications-tab.js - Communications tab (Quill RTE) with NoteID session handling and deleted-notes support
-// Updated: ensure RTE helpers present, guard Quill init if container missing, and check presence of methods before calling
+// modules/communications-tab.js - Communications tab with Quill RTE (enhanced toolbar, NoteID saves, deleted-note archive hooks)
+// Updated: scrollbar on editor, toolbar custom buttons (link, file, calendar, emoji, table, image), autosave bugfixes, save & close implemented.
+// Notes:
+// - For full Google Drive upload and Google Calendar direct-add you'll need to configure Google OAuth (gapi) and client id; code includes hooks and fallbacks.
+// - For interactive image resizing use a Quill image-resize plugin (recommended: quill-image-resize-module). See comments below.
 
 const CommunicationsTab = {
   contacts: [],
@@ -19,180 +22,127 @@ const CommunicationsTab = {
   currentNoteId: null,
   iconData: [],
 
-  // Render the tab HTML (full markup required so #commEditor exists before Quill init)
   async render() {
     const container = document.getElementById('communications');
     container.innerHTML = `
-      <div class="comm-container" id="commContainer">
-        <div class="comm-sidebar">
+      <div class="comm-container" id="commContainer" style="display:flex; gap:12px; align-items:flex-start; width:100%;">
+        <div class="comm-sidebar" style="flex:0 0 260px;">
           <div class="comm-sidebar-header">
-            <h3 style="margin-bottom:10px;font-size:1.1em;">Contacts</h3>
-            <input type="text" class="comm-search" placeholder="🔍 Search contacts..." oninput="CommunicationsTab.handleContactSearch(this.value)">
+            <h3 style="margin-bottom: 8px; font-size:1.05em;">Contacts</h3>
+            <input type="text" class="comm-search" placeholder="🔍 Search contacts..." oninput="CommunicationsTab.handleContactSearch(this.value)" style="width:100%;padding:6px;">
           </div>
-          <div class="comm-contact-list" id="contactList">
-            <div style="text-align:center;padding:40px 20px;color:var(--text-light)">Loading contacts...</div>
-          </div>
-          <div class="comm-history-list" id="historyList" style="display:none;">
-            <div style="padding:15px;background:white;border-bottom:1px solid var(--border);">
+          <div class="comm-contact-list" id="contactList" style="margin-top:8px;"></div>
+          <div class="comm-history-list" id="historyList" style="display:none; margin-top:10px;">
+            <div style="padding:10px; background:white; border-bottom:1px solid var(--border);">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <strong id="selectedContactHeader">Contact Name</strong>
-                <button class="btn-sm btn-primary" onclick="CommunicationsTab.saveAndClose()" id="btnSaveClose">💾 Save & Close</button>
+                <strong id="selectedContactHeader">Contact</strong>
+                <button id="btnSaveClose" class="btn-sm" onclick="CommunicationsTab.saveAndClose()" title="Save & Close" style="background:white; color:black; border:1px solid #ddd;">💾 Save & Close</button>
               </div>
             </div>
-            <div id="historyItems" style="padding:10px"></div>
+            <div id="historyItems" style="padding:10px;"></div>
           </div>
         </div>
 
-        <div class="comm-previous" id="previousView">
-          <div class="comm-previous-header">
-            <strong>Previous Note</strong>
-            <button class="comm-previous-close" onclick="CommunicationsTab.closePreviousView()">✕</button>
-          </div>
-          <div class="comm-editor-container">
-            <div style="padding:15px;background:white;border-radius:8px;margin-bottom:10px;">
-              <strong id="prevSummary">Summary</strong>
-              <div id="prevMeta" style="font-size:0.85em;color:var(--text-light);margin-top:5px">Date</div>
+        <div class="comm-main" style="flex:1 1 auto; min-width: 400px;">
+          <div class="comm-main-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+            <div id="selectedContactInfo" style="flex:1;">
+              <p style="color:var(--text-light); margin:0;">Select a contact to start logging communications</p>
             </div>
-            <div id="prevNoteArea" class="comm-prev-render" style="background:white;padding:12px;border-radius:6px;min-height:120px;overflow:auto"></div>
-          </div>
-        </div>
-
-        <div class="comm-main">
-          <div class="comm-main-header">
-            <div id="selectedContactInfo"><p style="color:var(--text-light)">Select a contact to start logging communications</p></div>
-            <input id="commSummary" type="text" class="comm-summary-input" placeholder="Communication summary" disabled style="display:none">
+            <input id="commSummary" type="text" placeholder="Summary (optional)" style="flex:0 0 280px; padding:6px; display:none;">
           </div>
 
-          <div class="comm-editor-container">
-            <div id="commEditor" style="min-height:200px;background:white;border-radius:6px;padding:8px;display:none;"></div>
-            <textarea id="commNoteArea" class="comm-note-area" placeholder="Start typing your communication notes here..." style="display:none;width:100%;min-height:200px;padding:8px;box-sizing:border-box;"></textarea>
+          <div class="comm-editor-and-toolbar" style="display:flex; gap:12px; margin-top:10px;">
+            <div class="comm-editor-container" style="flex:1 1 auto; background:transparent;">
+              <!-- Quill toolbar container -->
+              <div id="commToolbar" style="background:#fff;border:1px solid var(--border);border-radius:6px 6px 0 0;padding:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
+              <!-- Editor -->
+              <div id="commEditor" style="min-height:220px; background:white; border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px; overflow:hidden;">
+                <div class="ql-toolbar-spacer" style="display:none"></div>
+                <div id="editorInner" style="padding:8px;"></div>
+              </div>
+              <!-- Fallback textarea -->
+              <textarea id="commNoteArea" style="display:none; width:100%; min-height:220px; padding:8px; box-sizing:border-box;"></textarea>
+            </div>
+
+            <div class="comm-timeline" style="flex:0 0 160px;">
+              <div class="comm-timeline-header" style="font-weight:600; margin-bottom:8px;">Timeline</div>
+              <div class="comm-timeline-content" id="timelineContent" style="background:white; padding:8px; border:1px solid var(--border); border-radius:6px; min-height:200px; overflow:auto;"></div>
+            </div>
           </div>
 
-          <div class="comm-toolbar">
-            <button id="btnInsertTimestamp" class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertTimestamp()" disabled>🕐 Time</button>
-            <button id="btnInsertDate" class="btn btn-sm btn-secondary" onclick="CommunicationsTab.insertCalendarDate()" disabled>📅 Date</button>
-            <button id="btnUploadFile" class="btn btn-sm btn-secondary" onclick="CommunicationsTab.uploadFile()" disabled>📎 File</button>
-            <button id="btnInsertMenu" class="btn btn-sm btn-secondary" onclick="CommunicationsTab.showInsertMenu()" disabled>✨ Insert</button>
-            <button id="btnClearNote" class="btn btn-sm btn-secondary" onclick="CommunicationsTab.clearNote()" disabled>🗑️ Clear</button>
-            <button id="btnNewNote" class="btn btn-sm btn-primary" onclick="CommunicationsTab.createNewNote()" disabled>📝 New Note</button>
-            <span id="saveIndicator"></span>
-          </div>
-
-          <div class="comm-status">
-            <span id="statusText">Ready</span>
-          </div>
-        </div>
-
-        <div class="comm-timeline">
-          <div class="comm-timeline-header">Timeline</div>
-          <div class="comm-timeline-content" id="timelineContent">
-            <p style="text-align:center;color:var(--text-light);font-size:0.9em">Timestamps will appear here as you type</p>
+          <div id="statusArea" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div id="saveIndicator"></div>
+            <div id="statusText" style="color:var(--text-light)">Ready</div>
           </div>
         </div>
       </div>
 
-      <!-- Insert Menu Modal -->
-      <div id="insertMenuModal" class="modal">
+      <!-- calendar modal -->
+      <div id="rteCalendarModal" class="modal" style="display:none;">
         <div class="modal-content" style="max-width:600px;">
-          <div class="modal-header">
-            <h3>Insert Custom Element</h3>
-            <button class="modal-close" onclick="CommunicationsTab.closeInsertMenu()">✕</button>
+          <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Create Calendar Event</h3>
+            <button onclick="CommunicationsTab._closeCalendarModal()">✕</button>
           </div>
-          <div style="padding:20px;">
-            <div id="iconGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:10px;max-height:400px;overflow-y:auto">
-              <p style="text-align:center;color:var(--text-light)">Loading icons...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Calendar Modal -->
-      <div id="calendarModal" class="modal">
-        <div class="modal-content" style="max-width:500px;">
-          <div class="modal-header">
-            <h3>Insert Calendar Date</h3>
-            <button class="modal-close" onclick="CommunicationsTab.closeCalendarModal()">✕</button>
-          </div>
-          <form onsubmit="CommunicationsTab.handleCalendarInsert(event)" style="padding:20px;">
-            <div class="form-group">
-              <label>Date & Time</label>
-              <input type="datetime-local" id="calendarDateTime" required>
-            </div>
-            <div class="form-group">
-              <label>Event Title</label>
-              <input type="text" id="calendarTitle" required>
-            </div>
-            <div class="form-group">
-              <label>Notes (optional)</label>
-              <textarea id="calendarNotes" rows="3"></textarea>
-            </div>
-            <div style="display:flex;gap:10px;">
-              <button type="submit" class="btn btn-primary" style="flex:1">📅 Insert Date</button>
-              <button type="button" class="btn btn-secondary" style="flex:1" onclick="CommunicationsTab.closeCalendarModal()">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Drive setup -->
-      <div id="driveSetupModal" class="modal">
-        <div class="modal-content" style="max-width:500px;">
-          <div class="modal-header"><h3>🔒 Google Drive Setup</h3><button class="modal-close" onclick="CommunicationsTab.closeDriveSetup()">✕</button></div>
-          <div style="padding:20px;">
-            <p style="margin-bottom:15px">Provide a link to your Google Drive folder with read/write permissions.</p>
-            <div class="form-group">
-              <label>Google Drive Folder Link</label>
-              <input type="url" id="driveLink" placeholder="https://drive.google.com/drive/folders/..." required>
-            </div>
-            <div style="display:flex;gap:10px;margin-top:20px;">
-              <button class="btn btn-primary" style="flex:1" onclick="CommunicationsTab.saveDriveLink()">💾 Save Link</button>
-              <button class="btn btn-secondary" style="flex:1" onclick="CommunicationsTab.closeDriveSetup()">Cancel</button>
-            </div>
+          <div style="padding:12px;">
+            <form id="rteCalendarForm">
+              <div style="display:grid;grid-template-columns:1fr 1fr; gap:8px;">
+                <label>Start<input id="rteCalStart" type="datetime-local" required></label>
+                <label>End<input id="rteCalEnd" type="datetime-local" required></label>
+              </div>
+              <label>Title<input id="rteCalTitle" type="text" required></label>
+              <label>Description<textarea id="rteCalDesc" rows="3"></textarea></label>
+              <label>Location<input id="rteCalLoc" type="text"></label>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="submit" class="btn btn-primary">Create / Open in Google Calendar</button>
+                <button type="button" class="btn" onclick="CommunicationsTab._closeCalendarModal()">Cancel</button>
+              </div>
+            </form>
           </div>
         </div>
       </div>
 
       <style>
-        .comm-save-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .icon-item{display:flex;flex-direction:column;align-items:center;padding:10px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .2s}
-        .icon-item img{width:40px;height:40px;margin-bottom:5px}
-        @media (max-width:600px){.note-row{display:block !important}.note-ts{display:block;font-size:0.9em;color:var(--text-light);margin-bottom:6px}}
+        /* make ql-editor scrollable and constrained */
+        #commEditor .ql-editor {
+          max-height: 480px;
+          overflow-y: auto;
+        }
+        /* Inserted images default width 30% */
+        #commEditor img.inserted-image { width: 30%; height: auto; display:block; }
+        /* selected contact highlight */
+        .comm-contact-item.selected { background: #0b57d0; color: white; padding:8px; border-radius:6px; }
+        /* history item selected */
+        .comm-history-item.selected { background: #0b57d0; color: white; }
+        /* responsive */
+        @media (max-width:900px) {
+          .comm-container { flex-direction:column; }
+          .comm-sidebar { order:2; width:100%; }
+          .comm-main { order:1; width:100%; }
+          .comm-timeline { display:flex; width:100%; order:3; }
+        }
       </style>
     `;
 
+    // create inner editor container used to initialize Quill
+    // init editor after DOM inserted
     await this.init();
   },
 
-  /* ---------- RTE loader and initialization ---------- */
+  /* ---------- RTE loader and Quill initialization ---------- */
 
   async _ensureRTE(cssUrl, jsUrl) {
-    // If Quill present -> init
     if (window.Quill) {
       this._initQuill();
       return;
     }
-
     try {
       await this._loadCss(cssUrl);
       await this._loadScript(jsUrl);
-
-      // ensure container exists before initializing Quill
-      const editorEl = document.getElementById('commEditor');
-      if (!editorEl) {
-        console.warn('commEditor not found in DOM; will use textarea fallback.');
-        this._rteFallback();
-        return;
-      }
-
-      if (window.Quill) {
-        this._initQuill();
-      } else {
-        console.warn('Quill loaded but not available; using fallback.');
-        this._rteFallback();
-      }
+      if (window.Quill) this._initQuill();
+      else this._rteFallback();
     } catch (err) {
-      console.warn('Failed to load Quill assets, falling back to textarea.', err);
+      console.warn('RTE load failed', err);
       this._rteFallback();
     }
   },
@@ -207,7 +157,6 @@ const CommunicationsTab = {
 
   _loadCss(url) {
     return new Promise((resolve, reject) => {
-      // avoid double-loading
       if ([...document.getElementsByTagName('link')].some(l => l.href && l.href.includes(url))) return resolve();
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -220,7 +169,6 @@ const CommunicationsTab = {
 
   _loadScript(url) {
     return new Promise((resolve, reject) => {
-      // avoid double-loading
       if ([...document.getElementsByTagName('script')].some(s => s.src && s.src.includes(url))) return resolve();
       const s = document.createElement('script');
       s.src = url;
@@ -233,87 +181,362 @@ const CommunicationsTab = {
 
   _initQuill() {
     try {
-      // make sure container exists
-      const container = document.getElementById('commEditor');
-      if (!container) {
-        console.warn('Quill container #commEditor missing; falling back to textarea.');
+      // Attach Quill to #editorInner inside commEditor
+      const editorInner = document.getElementById('editorInner');
+      if (!editorInner) {
+        console.warn('Editor inner element missing; fallback to textarea');
         this._rteFallback();
         return;
       }
 
-      // initialize Quill
-      this.editor = new Quill('#commEditor', {
+      // Build a basic toolbar container (we will add custom buttons below)
+      const toolbarOptions = [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['link', 'image'],
+        [{ 'color': [] }, { 'background': [] }],
+        ['clean']
+      ];
+
+      // Create Quill editor
+      this.editor = new Quill(editorInner, {
         theme: 'snow',
         modules: {
-          toolbar: [
-            [{ header: [1, 2, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['link', 'image'],
-            ['clean']
-          ]
+          toolbar: toolbarOptions
         }
       });
 
-      // sanity check
+      // Insert custom toolbar UI (append custom buttons to commToolbar)
+      this._buildCustomToolbar();
+
       if (!this.editor || typeof this.editor.on !== 'function') {
-        console.error('Quill created but editor instance invalid; using textarea fallback.');
+        console.error('Quill instance invalid; using textarea fallback');
         this._rteFallback();
         return;
       }
 
-      this.editor.on('text-change', () => {
+      // Quill change handling
+      this.editor.on('text-change', (delta, oldDelta, source) => {
+        // update current note and timeline
         this.currentNote = this.getEditorContent();
-        this.updateTimeline();
-        // don't perform network save on every keystroke; Enter triggers an explicit save
-        this.queueAutoSave();
+        if (typeof this.updateTimeline === 'function') this.updateTimeline();
+        // Debounced autosave via queueAutoSave
+        if (typeof this.queueAutoSave === 'function') this.queueAutoSave();
       });
 
-      // show editor, hide fallback textarea
-      const ta = document.getElementById('commNoteArea');
-      if (ta) ta.style.display = 'none';
-      container.style.display = 'block';
+      // Paste handler to enforce images scaling
+      this.editor.root.addEventListener('paste', async (e) => {
+        // small guard; Quill already handles paste; here we ensure images get styled
+        setTimeout(() => {
+          const imgs = this.editor.root.querySelectorAll('img');
+          imgs.forEach(img => {
+            img.classList.add('inserted-image');
+          });
+        }, 50);
+      });
+
+      // Show editor UI
+      const commEditor = document.getElementById('commEditor');
+      if (commEditor) {
+        commEditor.style.display = 'block';
+      }
+      document.getElementById('commNoteArea').style.display = 'none';
 
       this.useRTE = true;
-      console.log('Quill initialized successfully');
+      console.log('Quill initialized');
     } catch (err) {
       console.error('Failed to initialize Quill:', err);
       this._rteFallback();
     }
   },
 
-  /* ---------- Initialization ---------- */
+  /* ---------- Custom toolbar creation and handlers ---------- */
+
+  _buildCustomToolbar() {
+    const toolbar = document.getElementById('commToolbar');
+    if (!toolbar) return;
+
+    // Clear existing
+    toolbar.innerHTML = '';
+
+    // basic built-in controls (we use simple buttons that call Quill formats)
+    const addToolBtn = (label, title, onClick) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-sm';
+      btn.textContent = label;
+      btn.title = title;
+      btn.style.padding = '6px 8px';
+      btn.onclick = onClick;
+      toolbar.appendChild(btn);
+      return btn;
+    };
+
+    // Formatting buttons using Quill APIs
+    addToolBtn('B', 'Bold', () => this.editor.format('bold', !this.editor.getFormat().bold));
+    addToolBtn('I', 'Italic', () => this.editor.format('italic', !this.editor.getFormat().italic));
+    addToolBtn('U', 'Underline', () => this.editor.format('underline', !this.editor.getFormat().underline));
+    addToolBtn('• List', 'Bullet List', () => { this.editor.format('list', 'bullet'); });
+    addToolBtn('1. List', 'Numbered List', () => { this.editor.format('list', 'ordered'); });
+
+    // Color and background selectors (use native selects)
+    const colorSelect = document.createElement('input');
+    colorSelect.type = 'color';
+    colorSelect.title = 'Text color';
+    colorSelect.style.marginLeft = '6px';
+    colorSelect.onchange = (e) => {
+      this.editor.format('color', e.target.value);
+    };
+    toolbar.appendChild(colorSelect);
+
+    const bgSelect = document.createElement('input');
+    bgSelect.type = 'color';
+    bgSelect.title = 'Highlight color';
+    bgSelect.style.marginLeft = '6px';
+    bgSelect.onchange = (e) => {
+      this.editor.format('background', e.target.value);
+    };
+    toolbar.appendChild(bgSelect);
+
+    // Emoji button - open small prompt to insert emoji characters
+    addToolBtn('😀', 'Insert emoji', () => {
+      const emoji = prompt('Enter emoji (or paste one):', '😀');
+      if (emoji) {
+        const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+        this.editor.insertText(range.index, emoji, 'user');
+        this.editor.setSelection(range.index + emoji.length);
+      }
+    });
+
+    // Insert Link: if selection present use Quill's link format; if not prompt for url & text
+    addToolBtn('🔗', 'Insert Hyperlink', () => {
+      const range = this.editor.getSelection();
+      if (range && range.length > 0) {
+        const url = prompt('Enter URL', 'https://');
+        if (url) this.editor.format('link', url);
+      } else {
+        // prompt for both
+        const url = prompt('Enter URL', 'https://');
+        if (!url) return;
+        const text = prompt('Link text', url);
+        const insertText = text || url;
+        const insertAt = (this.editor.getSelection(true) || { index: this.editor.getLength() }).index;
+        this.editor.insertText(insertAt, insertText, { link: url });
+        this.editor.setSelection(insertAt + insertText.length);
+      }
+    });
+
+    // Insert Calendar button -> opens modal with richer fields; handler below
+    const calBtn = addToolBtn('📅', 'Insert Calendar Event', () => {
+      this._openCalendarModal();
+    });
+
+    // Insert file button
+    addToolBtn('📎', 'Insert file (Google Drive)', () => {
+      this._handleInsertFile();
+    });
+
+    // Image upload button
+    addToolBtn('🖼️', 'Insert image', () => {
+      this._handleImageInsert();
+    });
+
+    // Insert table button (inserts a simple table HTML)
+    addToolBtn('🔳', 'Insert table', () => {
+      const rows = parseInt(prompt('Rows', '2'), 10) || 2;
+      const cols = parseInt(prompt('Columns', '2'), 10) || 2;
+      let tableHtml = '<table style="width:100%; border-collapse:collapse;">';
+      for (let r=0; r<rows; r++) {
+        tableHtml += '<tr>';
+        for (let c=0; c<cols; c++) {
+          tableHtml += `<td style="border:1px solid #ccc;padding:6px;">&nbsp;</td>`;
+        }
+        tableHtml += '</tr>';
+      }
+      tableHtml += '</table><p></p>';
+      const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+      // paste HTML by using dangerouslyPasteHTML if clipboard available, otherwise insert plain text fallback
+      if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+        this.editor.clipboard.dangerouslyPasteHTML(range.index, tableHtml);
+      } else {
+        this.editor.insertText(range.index, this._stripHtml(tableHtml));
+      }
+    });
+
+    // Save button moved to toolbar as icon (duplicate save and close still in header)
+    addToolBtn('💾', 'Save note (Enter also saves)', () => {
+      if (typeof this.handleEnterSave === 'function') this.handleEnterSave();
+    });
+
+    // Keep styling tidy
+    toolbar.style.alignItems = 'center';
+  },
+
+  /* ---------- File / Image Insert Handlers ---------- */
+
+  async _handleImageInsert() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      // If googleDriveLink + OAuth available, upload to Drive (hook area)
+      if (this.googleDriveLink && window.gapi && window.gapi.client && this._driveUploadAvailable()) {
+        try {
+          const uploaded = await this._uploadFileToDrive(file);
+          // insert link / image link
+          const url = uploaded.webViewLink || uploaded.webContentLink || uploaded.thumbnailLink || uploaded.id;
+          const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+          this.editor.insertEmbed(range.index, 'image', url);
+          // apply 30% width via DOM after insertion
+          setTimeout(() => {
+            const imgs = this.editor.root.querySelectorAll('img');
+            const img = imgs[imgs.length-1];
+            if (img) img.classList.add('inserted-image');
+          }, 50);
+        } catch (err) {
+          console.error('Drive upload failed', err);
+          alert('Drive upload failed. Inserting image as base64 instead.');
+          this._insertImageAsBase64(file);
+        }
+      } else {
+        // fallback: insert inline base64
+        this._insertImageAsBase64(file);
+      }
+    };
+    input.click();
+  },
+
+  _insertImageAsBase64(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+      this.editor.insertEmbed(range.index, 'image', dataUrl);
+      setTimeout(() => {
+        const imgs = this.editor.root.querySelectorAll('img');
+        const img = imgs[imgs.length-1];
+        if (img) img.classList.add('inserted-image');
+      }, 50);
+    };
+    reader.readAsDataURL(file);
+  },
+
+  async _handleInsertFile() {
+    // Use Drive upload if available, otherwise create a reference to the stored googleDriveLink
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!this.googleDriveLink) {
+        // prompt to save drive link
+        if (confirm('No Google Drive folder configured. Would you like to save a Google Drive folder link for uploads?')) {
+          const link = prompt('Enter your Google Drive folder link (shareable):', '');
+          if (link) {
+            this.googleDriveLink = link;
+            localStorage.setItem('userSettings', JSON.stringify({ googleDriveLink: link }));
+            alert('Saved Google Drive folder link. File reference will be inserted pointing to that folder.');
+          }
+        }
+      }
+      if (this.googleDriveLink && (!window.gapi || !this._driveUploadAvailable())) {
+        // fallback: insert a reference string into the editor pointing to the folder (user must upload separately)
+        const folderRef = `${this.googleDriveLink.replace(/\/$/, '')}/${encodeURIComponent(file.name)}`;
+        const insertText = `📎 ${file.name} - ${folderRef}`;
+        const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+        this.editor.insertText(range.index, insertText, 'user');
+      } else if (this._driveUploadAvailable()) {
+        try {
+          const uploaded = await this._uploadFileToDrive(file);
+          const link = uploaded.webViewLink || uploaded.webContentLink || uploaded.id;
+          const insertText = `📎 ${file.name} - ${link}`;
+          const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+          this.editor.insertText(range.index, insertText, 'user');
+        } catch (err) {
+          console.error('Drive upload failed', err);
+          alert('Drive upload failed; inserted a local reference.');
+          const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+          this.editor.insertText(range.index, `📎 ${file.name}`, 'user');
+        }
+      }
+    };
+    input.click();
+  },
+
+  // Placeholder helper to check if drive upload via gapi is configured
+  _driveUploadAvailable() {
+    // Replace this with real checks for gapi auth + drive scope
+    return !!(window.gapi && window.gapi.client && window.gapi.client.drive);
+  },
+
+  // Upload file to Google Drive via gapi client (requires prior gapi auth & drive scope)
+  async _uploadFileToDrive(file) {
+    // This requires the app to have loaded gapi, initialized with clientId, and user to have signed in with drive.file or drive scopes.
+    // Implementer note: you must include gapi script and call gapi.auth2.init / gapi.client.init with your client id and scopes.
+    if (!this._driveUploadAvailable()) throw new Error('Drive API not configured.');
+
+    // Create metadata
+    const metadata = {
+      name: file.name,
+      mimeType: file.type,
+      parents: [] // leave blank or the folder id extracted from googleDriveLink if provided
+    };
+
+    // If googleDriveLink contains folder ID, parse it
+    const folderId = this._extractDriveFolderId(this.googleDriveLink);
+    if (folderId) metadata.parents = [folderId];
+
+    const accessToken = gapi.auth.getToken().access_token;
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,webContentLink,thumbnailLink', {
+      method: 'POST',
+      headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
+      body: form
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Drive upload failed');
+    }
+    return await res.json();
+  },
+
+  _extractDriveFolderId(link) {
+    if (!link) return null;
+    // Try to find folder id in typical drive URLs
+    const m = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  },
+
+  /* ---------- Initialization and event wiring ---------- */
 
   async init() {
-    console.log('Initializing Communications tab...');
+    // Load local Quill CSS/JS
+    const cssPath = 'css/quill.css'; // ensure deploy copies this
+    const jsPath = 'js/quill.js';    // ensure deploy copies this
 
-    // paths relative to site root - ensure deploy copies them to _site/css and _site/js
-    const cssPath = 'css/quill.css';
-    const jsPath = 'js/quill.js';
+    await this._ensureRTE(cssPath, jsPath);
 
-    // ensure helper exists and call; guard if not defined
-    if (typeof this._ensureRTE === 'function') {
-      await this._ensureRTE(cssPath, jsPath);
-    } else {
-      console.warn('_ensureRTE not available; using textarea fallback.');
-      this._rteFallback();
-    }
-
-    // Ensure the EncryptionService is ready (if needed)
     if (!window.EncryptionService || !EncryptionService.isReady()) {
       const cList = document.getElementById('contactList');
-      if (cList) cList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Encryption not initialized. Please refresh the page.</div>';
+      if (cList) cList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger)">Encryption not initialized. Please refresh.</div>';
       return;
     }
 
-    // Guard calls for existence to avoid "is not a function" runtime errors
+    // Load contacts, user settings, icons
     if (typeof this.loadContacts === 'function') await this.loadContacts();
     if (typeof this.loadUserSettings === 'function') await this.loadUserSettings();
     if (typeof this.displayContacts === 'function') this.displayContacts();
     if (typeof this.updateTimeline === 'function') this.updateTimeline();
     if (typeof this.loadIcons === 'function') await this.loadIcons();
 
-    // Wire fallback textarea if not using RTE
+    // Wire textarea fallback if not using RTE
     if (!this.useRTE) {
       const ta = document.getElementById('commNoteArea');
       if (ta) {
@@ -330,116 +553,118 @@ const CommunicationsTab = {
         });
       }
     } else {
-      // ensure Enter triggers save but allows newline
+      // Add enter binding to Quill keyboard (still allow newline)
       try {
         if (this.editor && this.editor.keyboard && typeof this.editor.keyboard.addBinding === 'function') {
           this.editor.keyboard.addBinding({ key: 13 }, (range, context) => {
             if (typeof this.handleEnterSave === 'function') {
-              this.handleEnterSave().catch(e => console.error('Enter-save failed', e));
+              this.handleEnterSave().catch(e => console.error(e));
             }
-            return true; // allow default newline behavior
+            return true;
           });
         }
       } catch (e) {
-        console.warn('Failed to attach Enter binding to Quill', e);
+        console.warn('Could not attach Enter binding', e);
       }
     }
 
-    // Ensure toolbar initial state
-    ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.disabled = !this.selectedContact;
-    });
-  },
+    // Ensure Save & Close exists (header button)
+    const sc = document.getElementById('btnSaveClose');
+    if (sc) sc.onclick = () => { if (typeof this.saveAndClose === 'function') this.saveAndClose(); };
 
-  /* ---------- NoteID and save logic (unchanged) ---------- */
-
-  _generateDateId() {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-  },
-
-  _ensureCurrentNoteId() {
-    if (!this.currentNoteId && this.selectedContact) {
-      const dateId = this._generateDateId();
-      this.currentNoteId = `${this.selectedContact.id}_${dateId}`;
-    }
-    return this.currentNoteId;
-  },
-
-  async handleEnterSave() {
-    if (!this.selectedContact) {
-      console.warn('No contact selected; cannot save note.');
-      return;
-    }
-
-    const contentHtml = this.getEditorContent() || '';
-    const plainText = this._stripHtml(contentHtml);
-    const lines = plainText.split('\n');
-    const nowTime = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
-
-    const savedHtmlLines = lines.map((line, idx) => {
-      const trimmed = line.trim();
-      const hasTs = /^\[\d{2}:\d{2}\]/.test(trimmed);
-      if (!hasTs && trimmed !== '') {
-        return `<div class="note-row" data-line="${idx}"><span class="note-ts">[${nowTime}]</span><span class="note-text">${this._escapeHtml(line)}</span></div>`;
-      } else {
-        const tsText = hasTs ? trimmed.match(/^\[\d{2}:\d{2}\]/)[0] : '';
-        const text = hasTs ? trimmed.replace(/^\[\d{2}:\d{2}\]\s?/, '') : trimmed;
-        return `<div class="note-row" data-line="${idx}"><span class="note-ts">${this._escapeHtml(tsText)}</span><span class="note-text">${this._escapeHtml(text)}</span></div>`;
-      }
-    }).join('');
-
-    const noteId = this._ensureCurrentNoteId();
-    if (!noteId) {
-      console.error('Failed to build NoteID; aborting save.');
-      return;
-    }
-
+    // restore googleDriveLink from settings if present
     try {
-      if (typeof CommunicationsStorage?.saveNoteById === 'function') {
-        await CommunicationsStorage.saveNoteById(this.selectedContact.id, noteId.split('_')[1], savedHtmlLines, document.getElementById('commSummary')?.value || '');
-      } else if (typeof CommunicationsStorage?.saveNoteSession === 'function') {
-        // fallback if saveNoteById not present
-        await CommunicationsStorage.saveNoteSession(this.selectedContact.id, noteId, savedHtmlLines, document.getElementById('commSummary')?.value || '');
-      } else {
-        throw new Error('No storage method available to save note.');
-      }
+      const settings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+      this.googleDriveLink = settings.googleDriveLink || this.googleDriveLink || null;
+    } catch (e) {
+      this.googleDriveLink = this.googleDriveLink || null;
+    }
+  },
 
-      this.lastSaveTime = new Date();
-      this.currentNote = savedHtmlLines;
-      this._renderTimelineFromSavedContent(savedHtmlLines);
-      if (typeof this.loadContactCommunications === 'function') await this.loadContactCommunications();
+  /* ---------- Autosave + Save helpers ---------- */
+
+  queueAutoSave() {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => {
+      // autosave using same save method as Enter (overwrite NoteID)
+      if (typeof this.handleEnterSave === 'function') this.handleEnterSave().catch(e => console.error('Auto-save failed', e));
+    }, 1800);
+  },
+
+  // Save & Close - exposed for header and toolbar
+  async saveAndClose() {
+    if (!this.selectedContact) return;
+    const indicator = document.getElementById('saveIndicator');
+    if (indicator) indicator.innerHTML = '<span class="comm-save-spinner"></span>Saving...';
+    try {
+      // ensure final save
+      if (typeof this.handleEnterSave === 'function') await this.handleEnterSave();
+      if (indicator) indicator.innerHTML = '✓ Saved';
+      setTimeout(() => {
+        if (indicator) indicator.innerHTML = '';
+      }, 1200);
+      // deselect contact
+      if (typeof this.deselectContact === 'function') this.deselectContact();
     } catch (err) {
-      console.error('Error saving note (Enter):', err);
-      alert('Failed to save note: ' + (err.message || err));
+      console.error('Save and close failed', err);
+      if (indicator) indicator.innerHTML = '✗ Save failed';
     }
   },
 
-  _renderTimelineFromSavedContent(savedHtml) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div>${savedHtml}</div>`, 'text/html');
-    const rows = Array.from(doc.querySelectorAll('.note-row'));
-    const timelineEl = document.getElementById('timelineContent');
-    if (!timelineEl) return;
+  /* ---------- Calendar modal handlers ---------- */
 
-    let timelineHTML = '';
-    rows.forEach((row, idx) => {
-      const tsEl = row.querySelector('.note-ts');
-      const tsText = tsEl ? tsEl.textContent.trim() : '';
-      timelineHTML += `<div class="comm-timestamp">${idx === 0 ? this._escapeHtml(tsText) : '&nbsp;'}</div>`;
-    });
+  _openCalendarModal() {
+    const modal = document.getElementById('rteCalendarModal');
+    if (!modal) return;
+    // set defaults
+    const now = new Date();
+    const start = new Date(now.getTime() + (5*60*1000));
+    const end = new Date(start.getTime() + 60*60*1000);
+    document.getElementById('rteCalStart').value = start.toISOString().slice(0,16);
+    document.getElementById('rteCalEnd').value = end.toISOString().slice(0,16);
+    document.getElementById('rteCalTitle').value = (document.getElementById('commSummary')?.value) || '';
+    document.getElementById('rteCalDesc').value = '';
+    document.getElementById('rteCalLoc').value = '';
+    modal.style.display = 'block';
 
-    if (rows.length === 0) {
-      const nowStr = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
-      timelineHTML = `<div class="comm-timestamp">${this._escapeHtml(nowStr)}</div>`;
-    }
-
-    timelineEl.innerHTML = timelineHTML;
+    document.getElementById('rteCalendarForm').onsubmit = (e) => {
+      e.preventDefault();
+      const startVal = document.getElementById('rteCalStart').value;
+      const endVal = document.getElementById('rteCalEnd').value;
+      const title = document.getElementById('rteCalTitle').value;
+      const desc = document.getElementById('rteCalDesc').value;
+      const loc = document.getElementById('rteCalLoc').value;
+      // Build google calendar create url
+      const startIso = new Date(startVal).toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+      const endIso = new Date(endVal).toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+      const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: title,
+        dates: `${startIso}/${endIso}`,
+        details: desc,
+        location: loc,
+        sf: 'true',
+        output: 'xml'
+      });
+      const url = `https://calendar.google.com/calendar/render?${params.toString()}`;
+      // Insert an event text into editor plus link to add
+      const eventText = `📅 ${new Date(startVal).toLocaleString()} - ${title}\n`;
+      const range = this.editor.getSelection(true) || { index: this.editor.getLength() };
+      if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) {
+        this.editor.clipboard.dangerouslyPasteHTML(range.index, `${this._escapeHtml(eventText)}<br><a href="${url}" target="_blank">Add to Google Calendar</a><br>`);
+      } else {
+        this.editor.insertText(range.index, eventText + `Add to Google Calendar: ${url}\n`);
+      }
+      this._closeCalendarModal();
+    };
   },
 
-  /* ---------- Contacts/communications functions (existing) ---------- */
+  _closeCalendarModal() {
+    const modal = document.getElementById('rteCalendarModal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  /* ---------- Contacts + History UI ---------- */
 
   async loadContacts() {
     try {
@@ -447,7 +672,7 @@ const CommunicationsTab = {
     } catch (err) {
       console.error('Error loading contacts', err);
       const listEl = document.getElementById('contactList');
-      if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--danger)">Error loading contacts</div>`;
+      if (listEl) listEl.innerHTML = `<div style="padding:12px;color:var(--danger)">Error loading contacts</div>`;
     }
   },
 
@@ -456,13 +681,13 @@ const CommunicationsTab = {
     if (!listEl) return;
     const filtered = this.getFilteredContacts();
     if (!filtered || filtered.length === 0) {
-      listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-light)">No contacts found</div>`;
+      listEl.innerHTML = `<div style="padding:12px;color:var(--text-light)">No contacts</div>`;
       return;
     }
-    listEl.innerHTML = filtered.map(contact => `
-      <div class="comm-contact-item ${this.selectedContact?.id === contact.id ? 'active' : ''}" onclick="CommunicationsTab.selectContact(${contact.id})">
-        <div class="comm-contact-name">${contact.name}</div>
-        ${contact.organization ? `<div class="comm-contact-org">${contact.organization}</div>` : ''}
+    listEl.innerHTML = filtered.map(c => `
+      <div class="comm-contact-item" data-contact-id="${c.id}" onclick="CommunicationsTab.selectContact(${c.id})" style="padding:8px; cursor:pointer;">
+        <div style="font-weight:600">${c.name}</div>
+        <div style="font-size:0.85em;color:var(--text-light)">${c.organization || ''}</div>
       </div>
     `).join('');
   },
@@ -474,43 +699,69 @@ const CommunicationsTab = {
   },
 
   handleContactSearch(value) {
-    this.searchQuery = value;
-    this.displayContacts();
+    this.searchQuery = value; this.displayContacts();
   },
 
   async selectContact(contactId) {
     this.selectedContact = this.contacts.find(c => c.id === contactId);
     if (!this.selectedContact) return;
+
+    // highlight selected contact in sidebar
+    document.querySelectorAll('#contactList .comm-contact-item').forEach(el => {
+      el.classList.remove('selected');
+      if (el.dataset.contactId && parseInt(el.dataset.contactId) === contactId) {
+        el.classList.add('selected');
+      }
+    });
+
+    // show history area
     document.getElementById('contactList').style.display = 'none';
     document.getElementById('historyList').style.display = 'block';
     document.getElementById('selectedContactHeader').textContent = this.selectedContact.name;
-    document.getElementById('selectedContactInfo').innerHTML = `<h3 style="margin-bottom:5px">${this.selectedContact.name}</h3><p style="color:var(--text-light);font-size:0.9em">${this.selectedContact.organization || 'No organization'}</p>`;
+    document.getElementById('selectedContactInfo').innerHTML = `
+      <h3 style="margin:0 0 6px 0">${this.selectedContact.name}</h3>
+      <div style="color:var(--text-light)">${this.selectedContact.organization || 'No organization'}</div>
+    `;
+    // set default summary to current date/time
     const summaryInput = document.getElementById('commSummary');
-    if (summaryInput) { summaryInput.style.display='block'; summaryInput.disabled=false; }
+    if (summaryInput) {
+      summaryInput.style.display = 'block';
+      const now = new Date();
+      summaryInput.value = `${now.toLocaleString()}`;
+      summaryInput.disabled = false;
+    }
 
-    if (this.useRTE && this.editor) { try { this.editor.enable(true); this.setEditorContent(''); this.editor.focus(); } catch(e){ console.warn('Error enabling editor', e); } }
+    // enable editor
+    if (this.useRTE && this.editor) { this.editor.enable(true); this.setEditorContent(''); this.editor.focus(); }
     else { const ta = document.getElementById('commNoteArea'); if (ta) { ta.disabled=false; ta.value=''; ta.focus(); } }
 
-    this.currentNote=''; this.lastTimestamp=null; this.currentNoteId=null;
-    ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=false; });
+    this.currentNote = ''; this.lastTimestamp = null; this.currentNoteId = null;
 
-    if (typeof this.loadContactCommunications === 'function') await this.loadContactCommunications();
-    if (window.currentUser && window.currentUser.isAdmin && typeof this._renderDeletedNotesSection === 'function') await this._renderDeletedNotesSection();
+    // toolbar button enabling
+    ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.disabled = false;
+    });
+
+    // load communications for contact (manifest)
+    await this.loadContactCommunications();
   },
 
   deselectContact() {
     this.selectedContact = null; this.communications = []; this.currentNote = ''; this.lastTimestamp = null; this.currentNoteId = null;
     document.getElementById('contactList').style.display = 'block';
     document.getElementById('historyList').style.display = 'none';
-    const info = document.getElementById('selectedContactInfo'); if (info) info.innerHTML = `<p style="color:var(--text-light)">Select a contact to start logging communications</p>`;
-    const summary = document.getElementById('commSummary'); if (summary) summary.style.display='none';
+    document.getElementById('selectedContactInfo').innerHTML = `<p style="color:var(--text-light)">Select a contact to start logging communications</p>`;
+    const summary = document.getElementById('commSummary'); if (summary) summary.style.display = 'none';
     if (!this.useRTE) { const ta = document.getElementById('commNoteArea'); if (ta) { ta.disabled=true; ta.value=''; } } else if (this.editor) { this.editor.disable(); this.setEditorContent(''); }
-    ['btnInsertTimestamp','btnInsertDate','btnUploadFile','btnInsertMenu','btnClearNote','btnNewNote'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=true; });
     this.displayContacts(); this.closePreviousView();
   },
 
   async loadContactCommunications() {
     try {
+      // ensure CommunicationsStorage available
+      const ok = await this._waitForStorage(2000);
+      if (!ok) throw new Error('CommunicationsStorage not available');
+
       this.communications = await CommunicationsStorage.listCommunications(this.selectedContact.id);
       this.displayCommunicationsList();
       const st = document.getElementById('statusText'); if (st) st.textContent = `${this.selectedContact.name} (${this.communications.length} previous communications)`;
@@ -523,14 +774,19 @@ const CommunicationsTab = {
   displayCommunicationsList() {
     const historyEl = document.getElementById('historyItems');
     if (!historyEl) return;
-    if (!this.communications || this.communications.length === 0) { historyEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-light);font-size:0.9em">No previous communications</div>`; return; }
+    if (!this.communications || this.communications.length === 0) {
+      historyEl.innerHTML = `<div style="padding:12px;color:var(--text-light)">No previous communications</div>`;
+      return;
+    }
 
     historyEl.innerHTML = this.communications.map(comm => `
-      <div class="comm-history-item" style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;">
-        <div style="flex:1;"><div style="font-size:0.85em;color:var(--text-light)">${formatDate(comm.timestamp)}</div><div style="font-weight:600">${comm.summary || 'No summary'}</div></div>
+      <div class="comm-history-item" data-comm-id="${comm.id}" onclick="CommunicationsTab.viewCommunication('${comm.id}')" style="padding:8px; margin-bottom:6px; border-radius:6px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <div style="flex:1">
+          <div style="font-size:0.85em;color:var(--text-light)">${formatDate(comm.timestamp)}</div>
+          <div style="font-weight:600">${comm.summary || 'No summary'}</div>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn-sm btn-primary" onclick="CommunicationsTab.viewCommunication('${comm.id}')">View</button>
-          ${ (window.currentUser && window.currentUser.isAdmin) ? `<button class="btn-sm btn-danger" onclick="CommunicationsTab.handleDeleteNoteClick('${comm.id}')">Delete</button>` : '' }
+          ${(window.currentUser && window.currentUser.isAdmin) ? `<button class="btn-sm btn-danger" onclick="event.stopPropagation(); CommunicationsTab.handleDeleteNoteClick('${comm.id}')">Delete</button>` : ''}
         </div>
       </div>
     `).join('');
@@ -539,28 +795,174 @@ const CommunicationsTab = {
   async viewCommunication(commId) {
     try {
       const comm = await CommunicationsStorage.loadCommunication(this.selectedContact.id, commId);
-      this.viewingComm = comm; document.getElementById('commContainer').classList.add('split-view');
+      this.viewingComm = comm;
+      document.getElementById('commContainer').classList.add('split-view');
       document.getElementById('prevSummary').textContent = comm.summary || 'No summary';
       document.getElementById('prevMeta').textContent = `${formatDate(comm.createdAt)} by ${comm.author}`;
-      const prev = document.getElementById('prevNoteArea'); if (prev) prev.innerHTML = comm.content || this._escapeHtml(comm.content || '');
-    } catch (err) { console.error('Error loading communication', err); alert('Failed to load communication'); }
+      const prev = document.getElementById('prevNoteArea');
+      if (prev) prev.innerHTML = comm.content || this._escapeHtml(comm.content || '');
+      // highlight selected history item
+      document.querySelectorAll('#historyItems .comm-history-item').forEach(el => el.classList.remove('selected'));
+      const el = document.querySelector(`#historyItems .comm-history-item[data-comm-id="${commId}"]`);
+      if (el) el.classList.add('selected');
+    } catch (err) {
+      console.error('Error loading communication', err);
+      alert('Failed to load communication');
+    }
   },
 
-  closePreviousView() { const c = document.getElementById('commContainer'); if (c) c.classList.remove('split-view'); this.viewingComm = null; },
+  async handleDeleteNoteClick(commId) {
+    if (!confirm('Delete this note (it will be archived; only admins can view deleted notes). Continue?')) return;
+    try {
+      await CommunicationsStorage.archiveAndDeleteNote(this.selectedContact.id, commId, (window.currentUser && window.currentUser.email) || 'unknown');
+      await this.loadContactCommunications();
+      if (window.currentUser && window.currentUser.isAdmin) this._renderDeletedNotesSection?.();
+      alert('Note archived (deleted).');
+    } catch (err) {
+      console.error('Archive/Delete failed', err);
+      alert('Failed to archive/delete note: ' + (err.message || err));
+    }
+  },
 
-  /* ---------- small utility methods used across the module ---------- */
+  /* ---------- Utility / storage wait helper ---------- */
 
-  getEditorContent() { if (this.useRTE && this.editor) return this.editor.root.innerHTML || ''; const ta = document.getElementById('commNoteArea'); return ta ? ta.value : ''; },
+  async _waitForStorage(timeoutMs = 2000) {
+    const start = Date.now();
+    while (!window.CommunicationsStorage && (Date.now() - start) < timeoutMs) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    return !!window.CommunicationsStorage;
+  },
 
-  setEditorContent(html) { if (this.useRTE && this.editor) { try { if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) this.editor.clipboard.dangerouslyPasteHTML(html || ''); else this.editor.root.innerHTML = html || ''; } catch (e) { this.editor.root.innerHTML = html || ''; } } else { const ta = document.getElementById('commNoteArea'); if (ta) ta.value = this._stripHtml(html || ''); } this.currentNote = html || ''; this.updateTimeline(); },
+  /* ---------- get/set editor content, timeline rendering ---------- */
 
-  updateTimeline() { const content = this.getEditorContent(); if (!content) { const t = document.getElementById('timelineContent'); if (t) t.innerHTML = ''; return; } let savedHtml = ''; if (/<div class="note-row"/.test(content)) savedHtml = content; else { const lines = this._stripHtml(content).split('\n'); savedHtml = lines.map((l,idx)=>`<div class="note-row" data-line="${idx}"><span class="note-ts"></span><span class="note-text">${this._escapeHtml(l)}</span></div>`).join(''); } this._renderTimelineFromSavedContent(savedHtml); },
+  getEditorContent() {
+    if (this.useRTE && this.editor) return this.editor.root.innerHTML || '';
+    const ta = document.getElementById('commNoteArea'); return ta ? ta.value : '';
+  },
+
+  setEditorContent(html) {
+    if (this.useRTE && this.editor) {
+      try {
+        if (this.editor.clipboard && this.editor.clipboard.dangerouslyPasteHTML) this.editor.clipboard.dangerouslyPasteHTML(this.editor.getLength(), html || '');
+        else this.editor.root.innerHTML = html || '';
+      } catch (e) {
+        this.editor.root.innerHTML = html || '';
+      }
+    } else {
+      const ta = document.getElementById('commNoteArea'); if (ta) ta.value = this._stripHtml(html || '');
+    }
+    this.currentNote = html || '';
+    if (typeof this.updateTimeline === 'function') this.updateTimeline();
+  },
+
+  _renderTimelineFromSavedContent(savedHtml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${savedHtml}</div>`, 'text/html');
+    const rows = Array.from(doc.querySelectorAll('.note-row'));
+    const timelineEl = document.getElementById('timelineContent');
+    if (!timelineEl) return;
+    let html = '';
+    rows.forEach((row, idx) => {
+      const tsEl = row.querySelector('.note-ts');
+      const tsText = tsEl ? tsEl.textContent.trim() : '';
+      html += `<div class="comm-timestamp">${idx === 0 ? this._escapeHtml(tsText) : '&nbsp;'}</div>`;
+    });
+    if (rows.length === 0) {
+      const nowStr = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+      html = `<div class="comm-timestamp">${this._escapeHtml(nowStr)}</div>`;
+    }
+    timelineEl.innerHTML = html;
+  },
+
+  updateTimeline() {
+    const content = this.getEditorContent();
+    if (!content) { const t = document.getElementById('timelineContent'); if (t) t.innerHTML = ''; return; }
+    let savedHtml = '';
+    if (/<div class="note-row"/.test(content)) savedHtml = content; else {
+      const lines = this._stripHtml(content).split('\n');
+      savedHtml = lines.map((l, idx) => `<div class="note-row" data-line="${idx}"><span class="note-ts"></span><span class="note-text">${this._escapeHtml(l)}</span></div>`).join('');
+    }
+    this._renderTimelineFromSavedContent(savedHtml);
+  },
+
+  /* ---------- Note saving logic (Enter or autosave uses this) ---------- */
+
+  _generateDateId() {
+    const d = new Date(); const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  },
+
+  _ensureCurrentNoteId() {
+    if (!this.currentNoteId && this.selectedContact) {
+      const dateId = this._generateDateId();
+      this.currentNoteId = `${this.selectedContact.id}_${dateId}`;
+    }
+    return this.currentNoteId;
+  },
+
+  async handleEnterSave() {
+    if (!this.selectedContact) { console.warn('No contact selected'); return; }
+    const contentHtml = this.getEditorContent() || '';
+    const plainText = this._stripHtml(contentHtml);
+    const lines = plainText.split('\n');
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+
+    const savedHtml = lines.map((line, idx) => {
+      const trimmed = line.trim();
+      const hasTs = /^\[\d{2}:\d{2}\]/.test(trimmed);
+      if (!hasTs && trimmed !== '') {
+        return `<div class="note-row" data-line="${idx}"><span class="note-ts">[${nowTime}]</span><span class="note-text">${this._escapeHtml(line)}</span></div>`;
+      } else {
+        const tsText = hasTs ? trimmed.match(/^\[\d{2}:\d{2}\]/)[0] : '';
+        const text = hasTs ? trimmed.replace(/^\[\d{2}:\d{2}\]\s?/, '') : trimmed;
+        return `<div class="note-row" data-line="${idx}"><span class="note-ts">${this._escapeHtml(tsText)}</span><span class="note-text">${this._escapeHtml(text)}</span></div>`;
+      }
+    }).join('');
+
+    const noteId = this._ensureCurrentNoteId();
+    if (!noteId) { console.error('Cannot create NoteID'); return; }
+
+    try {
+      // Try saveNoteById, fallback to saveNoteSession
+      if (typeof CommunicationsStorage?.saveNoteById === 'function') {
+        await CommunicationsStorage.saveNoteById(this.selectedContact.id, noteId.split('_')[1], savedHtml, document.getElementById('commSummary')?.value || '');
+      } else if (typeof CommunicationsStorage?.saveNoteSession === 'function') {
+        await CommunicationsStorage.saveNoteSession(this.selectedContact.id, noteId, savedHtml, document.getElementById('commSummary')?.value || '');
+      } else {
+        throw new Error('No save method available in CommunicationsStorage');
+      }
+      this.lastSaveTime = new Date();
+      this.currentNote = savedHtml;
+      this._renderTimelineFromSavedContent(savedHtml);
+      if (typeof this.loadContactCommunications === 'function') await this.loadContactCommunications();
+    } catch (err) {
+      console.error('Save failed', err);
+      alert('Save failed: ' + (err.message || err));
+    }
+  },
+
+  /* ---------- Simple utilities ---------- */
 
   _escapeHtml(str) { if (!str) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); },
-
   _stripHtml(html) { if (!html) return ''; const d = document.createElement('div'); d.innerHTML = html; return d.textContent || d.innerText || ''; },
 
-  _escapeJs(str) { if (!str) return ''; return String(str).replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+  /* ---------- User settings helpers ---------- */
+
+  async loadUserSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem('userSettings') || '{}');
+      this.googleDriveLink = s.googleDriveLink || this.googleDriveLink || null;
+    } catch (e) { this.googleDriveLink = this.googleDriveLink || null; }
+  },
+
+  // For convenience – call to save googleDriveLink
+  saveDriveLink(link) {
+    this.googleDriveLink = link;
+    const s = JSON.parse(localStorage.getItem('userSettings') || '{}');
+    s.googleDriveLink = link;
+    localStorage.setItem('userSettings', JSON.stringify(s));
+  }
 
 };
 
