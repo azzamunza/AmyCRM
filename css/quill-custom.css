@@ -1,0 +1,49 @@
+/* quill-custom.css - restores toolbar background and aligns editor/timeline
+   Load this AFTER quill.snow.css */
+#quill-toolbar {
+  background: #ffffff;       /* ensure white background like default snow */
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 6px;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ensure Quill's toolbar buttons are visible and sized */
+#quill-toolbar .ql-formats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Make the editor content area scrollable without expanding page */
+#commEditor .ql-editor {
+  max-height: 480px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px;
+  line-height: 1.4;
+}
+
+/* Timeline entries should use same line-height, to align with editor lines */
+.comm-timeline-content .comm-timestamp {
+  line-height: 1.4;
+  padding: 6px 0;
+}
+
+/* Remove any top gap and ensure header sits flush with editor */
+.comm-editor-and-timeline { align-items: flex-start; }
+
+/* selected contact */
+.comm-contact-item.selected { background: #0b57d0; color: #fff; padding:8px; border-radius:6px; }
+
+/* inserted images default styling */
+#commEditor img.inserted-image { width:30%; height:auto; display:block; }
+
+/* responsive tweaks */
+@media (max-width:900px) {
+  .comm-container { flex-direction: column; }
+  .comm-timeline { order: 2; width:100%; }
+}
