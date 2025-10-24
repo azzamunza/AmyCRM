@@ -206,6 +206,31 @@ const CommunicationsTab = {
     } catch (e) { this.googleDriveLink = null; }
   },
 
+  async selectContact(contactId) {
+    this.selectedContact = this.contacts.find(c => c.id === contactId); if (!this.selectedContact) return;
+    document.querySelectorAll('#contactList .comm-contact-item').forEach(el=>el.classList.remove('selected'));
+    const el = document.querySelector(`#contactList .comm-contact-item[data-contact-id="${contactId}"]`);
+    if (el) el.classList.add('selected');
+    document.getElementById('contactList').style.display='none'; document.getElementById('historyList').style.display='block';
+    document.getElementById('selectedContactHeader').textContent = this.selectedContact.name;
+    document.getElementById('selectedContactInfo').innerHTML = `<h3 style="margin:0 0 6px 0">${this.selectedContact.name}</h3><div style="color:var(--text-light)">${this.selectedContact.organization || 'No organization'}</div>`;
+    const summaryInput = document.getElementById('commSummary'); if (summaryInput) { summaryInput.style.display='block'; const now=new Date(); summaryInput.value = now.toLocaleString(); summaryInput.disabled=false; }
+    if (this.useRTE && this.editor) { this.editor.enable(true); this.setEditorContent(''); this.editor.focus(); } else { const ta=document.getElementById('commNoteArea'); if (ta){ta.disabled=false; ta.value=''; ta.focus();} }
+    this.currentNote=''; this.lastTimestamp=null; this.currentNoteId=null;
+    await this.loadContactCommunications();
+  },
+
+  deselectContact() { this.selectedContact=null; this.communications=[]; this.currentNote=''; this.lastTimestamp=null; this.currentNoteId=null; document.getElementById('contactList').style.display='block'; document.getElementById('historyList').style.display='none'; document.getElementById('selectedContactInfo').innerHTML = `<p style="color:var(--text-light)">Select a contact to start logging communications</p>`; const s=document.getElementById('commSummary'); if(s) s.style.display='none'; if (!this.useRTE) { const ta=document.getElementById('commNoteArea'); if(ta){ta.disabled=true; ta.value='';} } else if(this.editor){this.editor.disable(); this.setEditorContent('');} this.displayContacts(); this.closePreviousView(); },
+
+  async loadContactCommunications() {
+    try {
+      const ok = await this._waitForStorage(2000); if (!ok) throw new Error('CommunicationsStorage not available');
+      this.communications = await CommunicationsStorage.listCommunications(this.selectedContact.id);
+      this.displayCommunicationsList();
+      const st = document.getElementById('statusText'); if (st) st.textContent = `${this.selectedContact.name} (${this.communications.length} previous communications)`;
+    } catch (err) { console.error('Error loading communications', err); const st=document.getElementById('statusText'); if(st) st.textContent='Error loading communications'; }
+  },
+
   /* Autosave */
   queueAutoSave() {
     if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
