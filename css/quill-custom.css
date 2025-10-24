@@ -47,3 +47,101 @@
   .comm-container { flex-direction: column; }
   .comm-timeline { order: 2; width:100%; }
 }
+
+/* Ensure this file is loaded AFTER quill.snow.css */
+
+/* Grid layout with 2 columns (editor, timeline) and 2 rows (toolbar, content) */
+.comm-grid {
+  display: grid;
+  grid-template-columns: 1fr 180px;  /* left editor flexible, right timeline narrow */
+  grid-template-rows: auto 1fr;      /* toolbar/header row, content row fills remaining height */
+  gap: 0;
+  align-items: start;                /* top-align rows */
+}
+
+/* Place items using grid areas (by element class) */
+.comm-grid .grid-toolbar {
+  grid-column: 1 / 2;   /* toolbar in left column, top row */
+  grid-row: 1 / 2;
+  padding: 6px 8px;
+}
+
+.comm-grid .grid-timeline-header {
+  grid-column: 2 / 3;   /* timeline header in right column, top row */
+  grid-row: 1 / 2;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
+.comm-grid .grid-editor {
+  grid-column: 1 / 2;   /* editor in left column, second row */
+  grid-row: 2 / 3;
+  min-height: 220px;
+  border-left: 0;
+}
+
+.comm-grid .grid-timeline {
+  grid-column: 2 / 3;   /* timeline content in right column, second row */
+  grid-row: 2 / 3;
+}
+
+/* Use Quill classes for toolbar so snow theme styles apply */
+#quill-toolbar.ql-toolbar {
+  background: #fff;                /* ensure white background */
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 6px;
+  border-radius: 6px 6px 0 0;
+}
+
+/* Editor container: let Quill render its toolbar and editor into #commEditor */
+.comm-editor-container {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
+/* Quill editor content scrolling (avoid page layout shifts) */
+#commEditor .ql-editor {
+  max-height: 520px;   /* restrict height */
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px;
+  line-height: 1.45;   /* set consistent line-height to align with timeline rows */
+}
+
+/* Make .note-row (the saved row elements) use the same height/line-height */
+#commEditor .note-row {
+  display: block;
+  line-height: 1.45;
+  padding: 6px 0;
+}
+
+/* Timeline rows are matched to note-row height/line-height */
+.comm-timeline-content .comm-timestamp {
+  line-height: 1.45;
+  padding: 6px 0;
+  border-bottom: none;
+}
+
+/* Ensure the timeline header is visually aligned with the toolbar top */
+.comm-timeline-header {
+  padding: 6px 8px;
+  font-weight: 600;
+}
+
+/* Inserted images default width */
+#commEditor img.inserted-image { width: 30%; height: auto; display:block; }
+
+/* selected contact styling, history, etc. preserved */
+.comm-contact-item.selected { background: #0b57d0; color: white; padding: 8px; border-radius:6px; }
+
+/* Responsive: collapse grid to columns on narrow screens */
+@media (max-width: 900px) {
+  .comm-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .comm-grid .grid-timeline-header { grid-column: 1 / 2; }
+  .comm-grid .grid-timeline { grid-column: 1 / 2; }
+}
