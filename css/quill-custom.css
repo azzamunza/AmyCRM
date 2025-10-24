@@ -5,26 +5,25 @@
 #quill-toolbar.ql-toolbar {
   background: #e3e3e3; /* changed per request */
   border-bottom: 1px solid rgba(0,0,0,0.08);
-  padding: 6px;
-  border-radius: 6px 6px 0 0;
+  padding: 3px 3px 3px 10px;
+  border-radius: 20px 00px 0px 0px;
 }
 
-/* ---- Grid layout (2 columns x 2 rows) ----
-   Left column = editor (toolbar + editor), Right column = timeline (header + content)
-*/
+
 .comm-grid {
   display: grid;
-  grid-template-columns: 1fr 180px; /* left editor flexible, right timeline narrow */
-  grid-template-rows: auto 1fr;     /* toolbar/header row, content row fills remaining height */
+  grid-template-columns: 1fr 180px; 
+  grid-template-rows: auto 1fr;    
   gap: 0;
-  align-items: start;               /* top-align rows so toolbar and timeline header line up */
+  align-items: start;              
 }
 
 /* Grid placement helpers */
 .comm-grid .grid-toolbar {
   grid-column: 1 / 2;
   grid-row: 1 / 2;
-  padding: 6px 8px;
+  padding: 0px 0px 0px 0px ;
+  vertical-align:baseline;
 }
 
 .comm-grid .grid-timeline-header {
@@ -33,23 +32,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
-  padding-left: 8px;
-  background: #ffffff; /* white box as requested */
+  align-self: bottom;
+  padding-left: 0px;
+  background: #ffffff;
   border: 1px solid var(--border);
   box-sizing: border-box;
   height: 100%;
+  border-radius: 00px 20px 0px 0px;
+  padding: 0px 0px 0px 0px;
+  vertical-align:baseline;
+  
 }
 
 .comm-grid .grid-editor {
   grid-column: 1 / 2;
   grid-row: 2 / 3;
   min-height: 220px;
+  
 }
 
 .comm-grid .grid-timeline {
   grid-column: 2 / 3;
   grid-row: 2 / 3;
+  
 }
 
 /* Editor container frame */
@@ -98,7 +103,7 @@
 
 /* Timeline header alignment and styling */
 .comm-timeline-header {
-  padding: 6px 8px;
+  padding: 0px 0px;
   font-weight: 600;
 }
 
