@@ -1,73 +1,34 @@
-/* quill-custom.css - restores toolbar background and aligns editor/timeline
-   Load this AFTER quill.snow.css */
-#quill-toolbar {
-  background: #ffffff;       /* ensure white background like default snow */
+/* quill-custom.css - toolbar background, grid alignment, timeline border, line-height sync
+   NOTE: load this AFTER quill.snow.css (css/quill.css) so Snow theme styles apply */
+
+/* ---- Toolbar (Snow theme) ---- */
+#quill-toolbar.ql-toolbar {
+  background: #fff;
   border-bottom: 1px solid rgba(0,0,0,0.08);
   padding: 6px;
   border-radius: 6px 6px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
 }
 
-/* ensure Quill's toolbar buttons are visible and sized */
-#quill-toolbar .ql-formats {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* Make the editor content area scrollable without expanding page */
-#commEditor .ql-editor {
-  max-height: 480px;
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: 10px;
-  line-height: 1.4;
-}
-
-/* Timeline entries should use same line-height, to align with editor lines */
-.comm-timeline-content .comm-timestamp {
-  line-height: 1.4;
-  padding: 6px 0;
-}
-
-/* Remove any top gap and ensure header sits flush with editor */
-.comm-editor-and-timeline { align-items: flex-start; }
-
-/* selected contact */
-.comm-contact-item.selected { background: #0b57d0; color: #fff; padding:8px; border-radius:6px; }
-
-/* inserted images default styling */
-#commEditor img.inserted-image { width:30%; height:auto; display:block; }
-
-/* responsive tweaks */
-@media (max-width:900px) {
-  .comm-container { flex-direction: column; }
-  .comm-timeline { order: 2; width:100%; }
-}
-
-/* Ensure this file is loaded AFTER quill.snow.css */
-
-/* Grid layout with 2 columns (editor, timeline) and 2 rows (toolbar, content) */
+/* ---- Grid layout (2 columns x 2 rows) ----
+   Left column = editor (toolbar + editor), Right column = timeline (header + content)
+*/
 .comm-grid {
   display: grid;
-  grid-template-columns: 1fr 180px;  /* left editor flexible, right timeline narrow */
-  grid-template-rows: auto 1fr;      /* toolbar/header row, content row fills remaining height */
+  grid-template-columns: 1fr 180px; /* left editor flexible, right timeline narrow */
+  grid-template-rows: auto 1fr;     /* toolbar/header row, content row fills remaining height */
   gap: 0;
-  align-items: start;                /* top-align rows */
+  align-items: start;               /* top-align rows so toolbar and timeline header line up */
 }
 
-/* Place items using grid areas (by element class) */
+/* Grid placement helpers */
 .comm-grid .grid-toolbar {
-  grid-column: 1 / 2;   /* toolbar in left column, top row */
+  grid-column: 1 / 2;
   grid-row: 1 / 2;
   padding: 6px 8px;
 }
 
 .comm-grid .grid-timeline-header {
-  grid-column: 2 / 3;   /* timeline header in right column, top row */
+  grid-column: 2 / 3;
   grid-row: 1 / 2;
   display: flex;
   align-items: center;
@@ -75,68 +36,93 @@
 }
 
 .comm-grid .grid-editor {
-  grid-column: 1 / 2;   /* editor in left column, second row */
+  grid-column: 1 / 2;
   grid-row: 2 / 3;
   min-height: 220px;
-  border-left: 0;
 }
 
 .comm-grid .grid-timeline {
-  grid-column: 2 / 3;   /* timeline content in right column, second row */
+  grid-column: 2 / 3;
   grid-row: 2 / 3;
 }
 
-/* Use Quill classes for toolbar so snow theme styles apply */
-#quill-toolbar.ql-toolbar {
-  background: #fff;                /* ensure white background */
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  padding: 6px;
-  border-radius: 6px 6px 0 0;
-}
-
-/* Editor container: let Quill render its toolbar and editor into #commEditor */
+/* Editor container frame */
 .comm-editor-container {
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 6px 6px;
+  overflow: hidden;
 }
 
-/* Quill editor content scrolling (avoid page layout shifts) */
+/* ---- Quill editor content area (scrollable) ----
+   Ensure the .ql-editor is constrained (prevents page layout shifts)
+   and set a consistent line-height so timeline rows can match.
+*/
 #commEditor .ql-editor {
-  max-height: 520px;   /* restrict height */
+  max-height: 520px;
   overflow-y: auto;
   box-sizing: border-box;
   padding: 10px;
-  line-height: 1.45;   /* set consistent line-height to align with timeline rows */
+  line-height: 1.45; /* adjust if you need tighter/looser alignment */
 }
 
-/* Make .note-row (the saved row elements) use the same height/line-height */
+/* Saved note rows inside editor — should match timeline row spacing */
 #commEditor .note-row {
   display: block;
   line-height: 1.45;
   padding: 6px 0;
 }
 
-/* Timeline rows are matched to note-row height/line-height */
+/* ---- Timeline styling ---- */
+.comm-timeline-content {
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 6px;
+  padding: 6px;
+  background: white;
+  box-sizing: border-box;
+}
+
 .comm-timeline-content .comm-timestamp {
-  line-height: 1.45;
+  line-height: 1.45; /* same as editor */
   padding: 6px 0;
   border-bottom: none;
 }
 
-/* Ensure the timeline header is visually aligned with the toolbar top */
+/* Timeline header alignment and styling */
 .comm-timeline-header {
   padding: 6px 8px;
   font-weight: 600;
 }
 
-/* Inserted images default width */
-#commEditor img.inserted-image { width: 30%; height: auto; display:block; }
+/* Inserted images default styling */
+#commEditor img.inserted-image {
+  width: 30%;
+  height: auto;
+  display: block;
+}
 
-/* selected contact styling, history, etc. preserved */
-.comm-contact-item.selected { background: #0b57d0; color: white; padding: 8px; border-radius:6px; }
+/* Selected contact style (sidebar) */
+.comm-contact-item.selected {
+  background: #0b57d0;
+  color: #fff;
+  padding: 8px;
+  border-radius: 6px;
+}
 
-/* Responsive: collapse grid to columns on narrow screens */
+/* Save spinner (small) */
+.comm-save-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Responsive behaviour: collapse to single column on small screens ---- */
 @media (max-width: 900px) {
   .comm-grid {
     grid-template-columns: 1fr;
