@@ -7,6 +7,8 @@
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="css/shared.css">
     <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/quill.css">
+    <link rel="stylesheet" href="css/quill-custom.css">
 </head>
 <body>
     <div class="app-header">
@@ -52,8 +54,10 @@
     <script src="encryption-local.js"></script>
     <script src="encryption-kms.js"></script>
     <script src="encryption.js"></script>
+
     
     <!-- Module Scripts: NOTE the order — communications-storage must load BEFORE the communications module -->
+    <script src="modules/quill-editor.js"></script>
     <script src="modules/dashboard-tab.js"></script>
     <script src="modules/contacts-tab.js"></script>
     <script src="modules/admin-tab.js"></script>
