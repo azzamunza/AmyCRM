@@ -31,85 +31,74 @@ const CommunicationsTab = {
   currentNoteId: null,
   iconData: [],
 
-  async render() {
-    const container = document.getElementById('communications');
-    container.innerHTML = `
-      <div class="comm-container" id="commContainer" style="display:flex; gap:12px; align-items:flex-start; width:100%;">
-        <div class="comm-sidebar" style="flex:0 0 260px;">
-          <div class="comm-sidebar-header">
-            <h3 style="margin-bottom:8px; font-size:1.05em;">Contacts</h3>
-            <input type="text" class="comm-search" placeholder="🔍 Search contacts..." oninput="CommunicationsTab.handleContactSearch(this.value)" style="width:100%;padding:6px;">
-          </div>
-          <div class="comm-contact-list" id="contactList" style="margin-top:8px;"></div>
-          <div class="comm-history-list" id="historyList" style="display:none; margin-top:10px;">
-            <div style="padding:10px;background:white;border-bottom:1px solid var(--border);">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <strong id="selectedContactHeader">Contact Name</strong>
-                <button id="btnSaveClose" class="btn-sm" title="Save & Close" style="background:white;color:black;border:1px solid #ddd;" onclick="CommunicationsTab.saveAndClose()">💾 Save & Close</button>
-              </div>
-            </div>
-            <div id="historyItems" style="padding:10px;"></div>
-          </div>
+ async render() {
+  const container = document.getElementById('communications');
+
+  // Grid layout: two columns (editor left, timeline right), two rows (toolbar row, content row)
+  container.innerHTML = `
+    <div id="commGrid" class="comm-grid" style="width:100%;">
+      <!-- Row 1 -->
+      <div class="grid-toolbar" id="toolbarArea">
+        <div id="quill-toolbar" class="ql-toolbar ql-snow">
+          <!-- Quill toolbar markup; keep standard ql-* classes so Quill styling applies -->
+          <span class="ql-formats">
+            <select class="ql-header">
+              <option value="1"></option>
+              <option value="2"></option>
+              <option value="3"></option>
+              <option selected></option>
+            </select>
+            <button class="ql-bold"></button>
+            <button class="ql-italic"></button>
+            <button class="ql-underline"></button>
+            <button class="ql-strike"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-list" value="ordered"></button>
+            <button class="ql-list" value="bullet"></button>
+          </span>
+          <span class="ql-formats">
+            <select class="ql-color"></select>
+            <select class="ql-background"></select>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-link"></button>
+            <button class="ql-image"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-insertEmoji">😀</button>
+            <button class="ql-insertCalendar">📅</button>
+            <button class="ql-insertFile">📎</button>
+            <button class="ql-insertTable">🔳</button>
+            <button class="ql-save">💾</button>
+          </span>
         </div>
+      </div>
 
-        <div class="comm-main" style="flex:1 1 auto; min-width:420px;">
-          <div class="comm-main-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-            <div id="selectedContactInfo" style="flex:1;">
-              <p style="color:var(--text-light); margin:0;">Select a contact to start logging communications</p>
-            </div>
-            <input id="commSummary" type="text" placeholder="Summary (optional)" style="flex:0 0 280px; padding:6px; display:none;">
-          </div>
+      <div class="grid-timeline-header" id="timelineHeaderArea">
+        <div class="comm-timeline-header">Timeline</div>
+      </div>
 
-          <div class="comm-editor-and-timeline" style="display:flex; gap:0; margin-top:10px; align-items:flex-start;">
-            <div class="comm-editor-wrapper" style="flex:1 1 auto; border:1px solid transparent;">
-              <div id="quill-toolbar" style="background:#fff; border:1px solid var(--border); border-bottom:none; border-radius:6px 6px 0 0; padding:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-                <span class="ql-formats">
-                  <select class="ql-header"><option value="1"></option><option value="2"></option><option value="3"></option><option selected></option></select>
-                  <button class="ql-bold"></button>
-                  <button class="ql-italic"></button>
-                  <button class="ql-underline"></button>
-                  <button class="ql-strike"></button>
-                </span>
-                <span class="ql-formats">
-                  <button class="ql-list" value="ordered"></button>
-                  <button class="ql-list" value="bullet"></button>
-                </span>
-                <span class="ql-formats">
-                  <select class="ql-color"></select>
-                  <select class="ql-background"></select>
-                </span>
-                <span class="ql-formats">
-                  <button class="ql-link"></button>
-                  <button class="ql-image"></button>
-                </span>
-                <span class="ql-formats">
-                  <button class="ql-insertEmoji">😀</button>
-                  <button class="ql-insertCalendar">📅</button>
-                  <button class="ql-insertFile">📎</button>
-                  <button class="ql-insertTable">🔳</button>
-                  <button class="ql-save">💾</button>
-                </span>
-              </div>
+      <!-- Row 2 -->
+      <div class="grid-editor" id="editorArea">
+        <div id="commEditor" class="comm-editor-container" aria-label="Communication editor"></div>
+        <textarea id="commNoteArea" style="display:none;"></textarea>
+      </div>
 
-              <div id="commEditor" style="min-height:220px; max-height:480px; overflow:hidden; border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px;"></div>
-              <textarea id="commNoteArea" style="display:none; width:100%; min-height:220px; padding:8px; box-sizing:border-box;"></textarea>
-            </div>
+      <div class="grid-timeline" id="timelineArea">
+        <div id="timelineContent" class="comm-timeline-content"></div>
+      </div>
+    </div>
 
-            <div class="comm-timeline" style="flex:0 0 160px; margin-left:0; display:flex; flex-direction:column; gap:6px;">
-              <div class="comm-timeline-header" style="font-weight:600; margin-bottom:0;">Timeline</div>
-              <div class="comm-timeline-content" id="timelineContent" style="background:white; padding:8px; border:1px solid var(--border); border-radius:6px; min-height:200px; overflow:auto;"></div>
-            </div>
-          </div>
+    <div id="statusArea" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div id="saveIndicator"></div>
+      <div id="statusText" style="color:var(--text-light)">Ready</div>
+    </div>
+  `;
 
-          <div id="statusArea" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-            <div id="saveIndicator"></div>
-            <div id="statusText" style="color:var(--text-light)">Ready</div>
-          </div>
-        </div>
-      </div>`;
-
-    await this.init();
-  },
+  // After DOM insertion, initialize Quill via the QuillEditor wrapper and wire change handlers
+  await this.init();
+},
 
   async init() {
     // Initialize QuillEditor module (must be loaded before this file)
