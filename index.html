@@ -112,6 +112,7 @@
     </div>
 
     <script src="config.js"></script>
+    <script src="api-proxy.js"></script>
     <script src="auth.js" onerror="console.error('Failed to load auth.js - check file path')"></script>
     <script>
         let CONFIG = window.CRM_CONFIG;
@@ -198,7 +199,7 @@
             const email = document.getElementById('signinEmail').value;
             const password = document.getElementById('signinPassword').value;
 
-            if (!CONFIG.GITHUB_TOKEN) {
+            if (!CONFIG.WORKER_URL || CONFIG.WORKER_URL.includes('your-worker-name')) {
                 showMessage('System not configured. Please contact administrator.', 'danger');
                 return;
             }
@@ -265,7 +266,7 @@
                 return;
             }
 
-            if (!CONFIG.GITHUB_TOKEN) {
+            if (!CONFIG.WORKER_URL || CONFIG.WORKER_URL.includes('your-worker-name')) {
                 showMessage('System not configured. Please contact administrator.', 'danger');
                 return;
             }
