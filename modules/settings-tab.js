@@ -133,20 +133,16 @@ const SettingsTab = {
             
             const data = await GitHubProxy.getRepository(CONFIG.GITHUB_USERNAME, CONFIG.GITHUB_REPO);
 
-            if (data) {
-                statusEl.innerHTML = `
-                    <div style="color: var(--success);">
-                        <strong>✓ Connected to GitHub via Cloudflare Worker</strong>
-                        <div style="margin-top: 10px; font-size: 0.9em;">
-                            <div>Repository: <strong>${data.full_name}</strong></div>
-                            <div>Last Push: <strong>${formatDate(data.pushed_at)}</strong></div>
-                            <div>Visibility: <strong>${data.private ? 'Private' : 'Public'}</strong></div>
-                        </div>
+            statusEl.innerHTML = `
+                <div style="color: var(--success);">
+                    <strong>✓ Connected to GitHub via Cloudflare Worker</strong>
+                    <div style="margin-top: 10px; font-size: 0.9em;">
+                        <div>Repository: <strong>${data.full_name}</strong></div>
+                        <div>Last Push: <strong>${formatDate(data.pushed_at)}</strong></div>
+                        <div>Visibility: <strong>${data.private ? 'Private' : 'Public'}</strong></div>
                     </div>
-                `;
-            } else {
-                statusEl.innerHTML = '<span style="color: var(--danger);">✗ Connection failed - Check worker configuration</span>';
-            }
+                </div>
+            `;
         } catch (error) {
             console.error('Connection test error:', error);
             statusEl.innerHTML = '<span style="color: var(--danger);">✗ Connection error: ' + error.message + '</span>';
