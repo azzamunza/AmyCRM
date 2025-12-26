@@ -4,7 +4,7 @@
 
 window.CRM_CONFIG = {
     // Cloudflare Worker URL (replace with your actual worker URL after deployment)
-    WORKER_URL: 'https://your-worker-name.your-subdomain.workers.dev',
+    WORKER_URL: 'shiny-pond-2e87.azzamunza.workers.dev',
     
     // Google OAuth Configuration (optional - for Google Sign-In)
     GOOGLE_CLIENT_ID: '',
