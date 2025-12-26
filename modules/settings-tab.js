@@ -123,29 +123,20 @@ const SettingsTab = {
         const statusEl = document.getElementById('syncStatus');
         const CONFIG = window.CRM_CONFIG;
 
-        if (!CONFIG.GITHUB_TOKEN) {
-            statusEl.innerHTML = '<span style="color: var(--danger);">✗ GitHub token not configured</span>';
+        if (!CONFIG.WORKER_URL || CONFIG.WORKER_URL.includes('your-worker-name')) {
+            statusEl.innerHTML = '<span style="color: var(--danger);">✗ Cloudflare Worker URL not configured</span>';
             return;
         }
 
         try {
             statusEl.innerHTML = '<span style="color: var(--text-light);">⏳ Testing connection...</span>';
             
-            const response = await fetch(
-                `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}`,
-                {
-                    headers: {
-                        'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
-                }
-            );
+            const data = await GitHubProxy.getRepository(CONFIG.GITHUB_USERNAME, CONFIG.GITHUB_REPO);
 
-            if (response.ok) {
-                const data = await response.json();
+            if (data) {
                 statusEl.innerHTML = `
                     <div style="color: var(--success);">
-                        <strong>✓ Connected to GitHub</strong>
+                        <strong>✓ Connected to GitHub via Cloudflare Worker</strong>
                         <div style="margin-top: 10px; font-size: 0.9em;">
                             <div>Repository: <strong>${data.full_name}</strong></div>
                             <div>Last Push: <strong>${formatDate(data.pushed_at)}</strong></div>
@@ -154,7 +145,7 @@ const SettingsTab = {
                     </div>
                 `;
             } else {
-                statusEl.innerHTML = '<span style="color: var(--danger);">✗ Connection failed - Check credentials</span>';
+                statusEl.innerHTML = '<span style="color: var(--danger);">✗ Connection failed - Check worker configuration</span>';
             }
         } catch (error) {
             console.error('Connection test error:', error);
@@ -174,11 +165,11 @@ const SettingsTab = {
             { name: 'Google Client ID', value: CONFIG.GOOGLE_CLIENT_ID, description: 'For Google OAuth sign-in' },
             { name: 'GitHub Username', value: CONFIG.GITHUB_USERNAME, description: 'GitHub account username' },
             { name: 'GitHub Repository', value: CONFIG.GITHUB_REPO, description: 'Repository name for data storage' },
-            { name: 'GitHub Token', value: CONFIG.GITHUB_TOKEN, description: 'Personal access token for API' }
+            { name: 'Worker URL', value: CONFIG.WORKER_URL, description: 'Cloudflare Worker proxy URL' }
         ];
 
         const html = checks.map(check => {
-            const isConfigured = check.value && check.value !== '';
+            const isConfigured = check.value && check.value !== '' && !check.value.includes('your-worker-name');
             const status = isConfigured ? '✅' : '❌';
             const color = isConfigured ? 'var(--success)' : 'var(--danger)';
             const statusText = isConfigured ? 'Configured' : 'Missing';
