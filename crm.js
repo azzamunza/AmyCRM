@@ -3,23 +3,15 @@
 // Fetch CRM data from GitHub
 async function fetchCRMData() {
     const CONFIG = window.CRM_CONFIG;
-    
-    if (!CONFIG.GITHUB_TOKEN) {
-        throw new Error('GitHub token not configured');
-    }
 
     try {
-        const response = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.DATA_FILE}`,
-            {
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            }
+        const data = await GitHubProxy.getFileContents(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.DATA_FILE
         );
 
-        if (response.status === 404) {
+        if (!data) {
             console.log('CRM data file not found, creating default structure');
             const defaultData = {
                 contacts: [],
@@ -32,11 +24,6 @@ async function fetchCRMData() {
             return defaultData;
         }
 
-        if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status}`);
-        }
-
-        const data = await response.json();
         const content = atob(data.content);
         return JSON.parse(content);
         
@@ -49,25 +36,16 @@ async function fetchCRMData() {
 // Save CRM data to GitHub
 async function saveCRMData(crmData) {
     const CONFIG = window.CRM_CONFIG;
-    
-    if (!CONFIG.GITHUB_TOKEN) {
-        throw new Error('GitHub token not configured');
-    }
 
     try {
         let sha = null;
-        const getResponse = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.DATA_FILE}`,
-            {
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            }
+        const fileData = await GitHubProxy.getFileContents(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.DATA_FILE
         );
 
-        if (getResponse.ok) {
-            const fileData = await getResponse.json();
+        if (fileData) {
             sha = fileData.sha;
         }
 
@@ -75,27 +53,14 @@ async function saveCRMData(crmData) {
         crmData.lastUpdated = new Date().toISOString();
 
         const content = btoa(unescape(encodeURIComponent(JSON.stringify(crmData, null, 2))));
-        const putResponse = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.DATA_FILE}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `Update CRM data - ${new Date().toISOString()}`,
-                    content: content,
-                    sha: sha
-                })
-            }
+        await GitHubProxy.updateFile(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.DATA_FILE,
+            content,
+            `Update CRM data - ${new Date().toISOString()}`,
+            sha
         );
-
-        if (!putResponse.ok) {
-            const errorData = await putResponse.json();
-            throw new Error(`Failed to save CRM data: ${errorData.message}`);
-        }
 
         console.log('CRM data saved successfully');
         return true;

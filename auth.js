@@ -3,23 +3,15 @@
 // GitHub API Functions
 async function fetchUsers() {
     const CONFIG = window.CRM_CONFIG;
-    
-    if (!CONFIG.GITHUB_TOKEN) {
-        throw new Error('GitHub token not configured');
-    }
 
     try {
-        const response = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
-            {
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            }
+        const data = await GitHubProxy.getFileContents(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.USERS_FILE
         );
 
-        if (response.status === 404) {
+        if (!data) {
             console.log('Users file not found, creating default admins');
             const defaultUsers = [
                 {
@@ -47,11 +39,6 @@ async function fetchUsers() {
             return defaultUsers;
         }
 
-        if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status}`);
-        }
-
-        const data = await response.json();
         const content = atob(data.content);
         return JSON.parse(content);
         
@@ -63,50 +50,28 @@ async function fetchUsers() {
 
 async function saveUsers(users) {
     const CONFIG = window.CRM_CONFIG;
-    
-    if (!CONFIG.GITHUB_TOKEN) {
-        throw new Error('GitHub token not configured');
-    }
 
     try {
         let sha = null;
-        const getResponse = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
-            {
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            }
+        const fileData = await GitHubProxy.getFileContents(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.USERS_FILE
         );
 
-        if (getResponse.ok) {
-            const fileData = await getResponse.json();
+        if (fileData) {
             sha = fileData.sha;
         }
 
         const content = btoa(unescape(encodeURIComponent(JSON.stringify(users, null, 2))));
-        const putResponse = await fetch(
-            `https://api.github.com/repos/${CONFIG.GITHUB_USERNAME}/${CONFIG.GITHUB_REPO}/contents/${CONFIG.USERS_FILE}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `Update users - ${new Date().toISOString()}`,
-                    content: content,
-                    sha: sha
-                })
-            }
+        await GitHubProxy.updateFile(
+            CONFIG.GITHUB_USERNAME,
+            CONFIG.GITHUB_REPO,
+            CONFIG.USERS_FILE,
+            content,
+            `Update users - ${new Date().toISOString()}`,
+            sha
         );
-
-        if (!putResponse.ok) {
-            const errorData = await putResponse.json();
-            throw new Error(`Failed to save users: ${errorData.message}`);
-        }
 
         console.log('Users saved successfully');
         return true;
