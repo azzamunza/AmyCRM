@@ -49,6 +49,7 @@
     </div>
 
     <script src="config.js"></script>
+    <script src="api-proxy.js"></script>
     <script src="auth.js"></script>
     <script src="crm.js"></script>
     <script src="encryption-local.js"></script>
@@ -160,7 +161,7 @@
                 { name: 'Google Client ID', value: CONFIG.GOOGLE_CLIENT_ID },
                 { name: 'GitHub Username', value: CONFIG.GITHUB_USERNAME },
                 { name: 'GitHub Repository', value: CONFIG.GITHUB_REPO },
-                { name: 'GitHub Token', value: CONFIG.GITHUB_TOKEN }
+                { name: 'Worker URL', value: CONFIG.WORKER_URL }
             ];
 
             const html = checks.map(check => {

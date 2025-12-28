@@ -7,9 +7,13 @@ const GitHubProxy = {
      * @returns {string} Worker URL
      */
     getWorkerURL() {
-        const workerUrl = window.CRM_CONFIG?.WORKER_URL;
+        let workerUrl = window.CRM_CONFIG?.WORKER_URL;
         if (!workerUrl || workerUrl.includes('your-worker-name')) {
             throw new Error('Cloudflare Worker URL not configured. Please update config.js');
+        }
+        // Ensure the URL has a protocol
+        if (!workerUrl.startsWith('http://') && !workerUrl.startsWith('https://')) {
+            workerUrl = `https://${workerUrl}`;
         }
         return workerUrl;
     },
